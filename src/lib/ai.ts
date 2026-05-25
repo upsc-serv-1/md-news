@@ -50,6 +50,22 @@ const CONFIG_KEY = "samachar_plus_ai_config";
 
 export function parseMarkdown(text: string): string {
   if (!text) return "";
+
+  // If it's already HTML (e.g. created by our WYSIWYG editor), bypass markdown escaping
+  if (
+    text.includes("<p>") ||
+    text.includes("<strong>") ||
+    text.includes("<b>") ||
+    text.includes("<ul>") ||
+    text.includes("<ol>") ||
+    text.includes("<br>") ||
+    text.includes("<em>") ||
+    text.includes("<i>") ||
+    text.includes("<u>") ||
+    text.includes("<a ")
+  ) {
+    return text;
+  }
   
   // Normalize carriage returns to prevent line matching failures
   let html = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");

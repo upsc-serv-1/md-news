@@ -6,6 +6,8 @@ import { aiService, DEFAULT_CATEGORIES } from "./lib/ai";
 import {
   Search,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Video,
   Eye,
   Calendar,
@@ -27,7 +29,7 @@ import AdminPanel from "./components/AdminPanel";
 import { AnimatePresence, motion } from "motion/react";
 import { optimizeCloudinaryUrl } from "./lib/cloudinary";
 
-const CHHATTISGARH_DISTRICTS = [
+export const CHHATTISGARH_DISTRICTS = [
   "रायपुर", "बिलासपुर", "दुर्ग", "भिलाई", "कोरबा", "राजनांदगांव", "रायगढ़", "जगदलपुर",
   "अम्बिकापुर", "धमतरी", "महासमुंद", "जांजगीर", "कांकेर", "कवर्धा", "बेमेतरा", "बालोद",
   "बलौदाबाजार", "मनेन्द्रगढ़", "जशपुर", "बैकुंठपुर", "सूरजपुर", "बलरामपुर", "गौरेला-पेंड्रा-मरवाही",
@@ -143,6 +145,34 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
 
+  // Site branding — loaded from Supabase on boot, localStorage as instant cache
+  const [siteTitle, setSiteTitleState] = useState(() => localStorage.getItem("sp_site_title") || "समाचार प्लस");
+  const [siteTagline, setSiteTaglineState] = useState(() => localStorage.getItem("sp_site_tagline") || "Samachar Plus");
+
+  // On boot: fetch from Supabase and update state
+  useEffect(() => {
+    newsService.getSiteSettings().then(s => {
+      if (s) {
+        setSiteTitleState(s.site_title || "समाचार प्लस");
+        setSiteTaglineState(s.site_tagline || "Samachar Plus");
+        localStorage.setItem("sp_site_title", s.site_title || "समाचार प्लस");
+        localStorage.setItem("sp_site_tagline", s.site_tagline || "Samachar Plus");
+      }
+    }).catch(err => console.warn("Failed to load site settings", err));
+  }, []);
+
+  // Also listen for cross-tab localStorage changes (when admin saves from same browser)
+  useEffect(() => {
+    const onStorage = () => {
+      setSiteTitleState(localStorage.getItem("sp_site_title") || "समाचार प्लस");
+      setSiteTaglineState(localStorage.getItem("sp_site_tagline") || "Samachar Plus");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const [isDistrictCollapsed, setIsDistrictCollapsed] = useState(false);
+
   // Carousel slider state
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -250,6 +280,7 @@ export default function App() {
     if (selectedDistrict) {
       list = list.filter(
         (a) =>
+          a.district === selectedDistrict ||
           a.title.includes(selectedDistrict) ||
           a.content.includes(selectedDistrict) ||
           (a.summary && a.summary.includes(selectedDistrict)) ||
@@ -527,8 +558,8 @@ export default function App() {
                     </div>
                   </div>
                   <div className="flex flex-col">
-                    <span className="font-display font-black text-sm sm:text-base text-pink-600 dark:text-pink-500 tracking-tight leading-none">समाचार प्लस</span>
-                    <span className="font-body text-[8px] font-bold text-slate-400 dark:text-zinc-500 tracking-widest uppercase">Samachar Plus</span>
+                    <span className="font-display font-black text-sm sm:text-base text-pink-600 dark:text-pink-500 tracking-tight leading-none">{siteTitle}</span>
+                    <span className="font-body text-[8px] font-bold text-slate-400 dark:text-zinc-500 tracking-widest uppercase">{siteTagline}</span>
                   </div>
                 </a>
               </div>
@@ -865,40 +896,45 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* MOBILE HORIZONTAL CATEGORIES */}
-        <div className="sm:hidden w-full bg-white dark:bg-zinc-900 border-b border-slate-100 dark:border-zinc-800/80 px-4 py-2 relative overflow-hidden select-none z-30 shadow-3xs">
-          <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white dark:from-zinc-900 to-transparent pointer-events-none z-10" />
-          <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white dark:from-zinc-900 to-transparent pointer-events-none z-10" />
-          <div className="flex gap-1.5 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap text-xs font-bold font-body">
-            <button
-              onClick={() => {
-                setSelectedCategory("all");
-                setSelectedArticleId(null);
-              }}
-              className={`p-1.5 px-3.5 rounded-full shrink-0 transition-all ${
-                selectedCategory === "all"
-                  ? "bg-brand-red text-white shadow-xs font-black"
-                  : "bg-slate-50 dark:bg-zinc-855 text-slate-600 dark:text-zinc-300"
-              }`}
-            >
-              मुख्य समाचार
-            </button>
-            {categories.map((cat) => (
+        {/* UNIFORM HORIZONTAL CATEGORIES */}
+        <div className="w-full bg-white dark:bg-zinc-900 border-b border-slate-100 dark:border-zinc-800/80 py-2.5 relative overflow-hidden select-none z-30 shadow-3xs">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-zinc-900 to-transparent pointer-events-none z-10" />
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-zinc-900 to-transparent pointer-events-none z-10" />
+            
+            <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap text-xs font-bold font-body py-1 px-2">
               <button
-                key={cat.id}
                 onClick={() => {
-                  setSelectedCategory(cat.id);
+                  setSelectedCategory("all");
+                  setCustomFilter(null);
                   setSelectedArticleId(null);
                 }}
-                className={`p-1.5 px-3.5 rounded-full shrink-0 transition-all ${
-                  selectedCategory === cat.id
-                    ? "bg-brand-red text-white shadow-xs font-black"
-                    : "bg-slate-50 dark:bg-zinc-855 text-slate-600 dark:text-zinc-300"
+                className={`p-1.5 px-3.5 rounded-full shrink-0 transition-all duration-200 cursor-pointer ${
+                  selectedCategory === "all" && !customFilter
+                    ? "bg-brand-red text-white shadow-xs font-black scale-102"
+                    : "bg-slate-50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 hover:scale-102"
                 }`}
               >
-                {cat.name_hi}
+                मुख्य समाचार
               </button>
-            ))}
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategory(cat.id);
+                    setCustomFilter(null);
+                    setSelectedArticleId(null);
+                  }}
+                  className={`p-1.5 px-3.5 rounded-full shrink-0 transition-all duration-200 cursor-pointer ${
+                    selectedCategory === cat.id && !customFilter
+                      ? "bg-brand-red text-white shadow-xs font-black scale-102"
+                      : "bg-slate-50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 hover:scale-102"
+                  }`}
+                >
+                  {cat.name_hi}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -1011,31 +1047,43 @@ export default function App() {
 
                   {/* 4. आपका जिला (Jaipur, Jodhpur, etc.) */}
                   <div className="flex flex-col">
-                    <div className="flex items-center gap-2.5 w-full px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-zinc-300">
-                      <Compass className="w-4 h-4 text-pink-500" />
-                      <span>आपका जिला</span>
-                    </div>
+                    <button
+                      onClick={() => setIsDistrictCollapsed(!isDistrictCollapsed)}
+                      className="flex items-center justify-between w-full px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 rounded-xl transition-all cursor-pointer select-none"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Compass className="w-4 h-4 text-pink-500" />
+                        <span>आपका जिला</span>
+                      </div>
+                      {isDistrictCollapsed ? (
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-455 dark:text-zinc-555 transition-transform duration-200" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-455 dark:text-zinc-555 transition-transform duration-200" />
+                      )}
+                    </button>
                     {/* Collapsible list of districts */}
-                    <div className="ml-7 mt-0.5 mb-2 flex flex-col gap-1 border-l border-slate-100 dark:border-zinc-800 pl-3">
-                      {["रायपुर", "बिलासपुर", "दुर्ग", "कोरबा", "जगदलपुर"].map((dist) => (
-                        <button
-                          key={dist}
-                          onClick={() => {
-                            setSelectedDistrict(dist);
-                            setSelectedCategory("all");
-                            setCustomFilter(null);
-                            setSelectedArticleId(null);
-                          }}
-                          className={`text-left text-xs py-1.5 transition-all hover:text-pink-650 dark:hover:text-pink-450 cursor-pointer ${
-                            selectedDistrict === dist
-                              ? "text-pink-600 dark:text-pink-400 font-extrabold"
-                              : "text-slate-500 dark:text-zinc-400 hover:translate-x-0.5 duration-200"
-                          }`}
-                        >
-                          ▸ {dist}
-                        </button>
-                      ))}
-                    </div>
+                    {!isDistrictCollapsed && (
+                      <div className="ml-7 mt-0.5 mb-2 flex flex-col gap-1 border-l border-slate-100 dark:border-zinc-800 pl-3">
+                        {["रायपुर", "बिलासपुर", "दुर्ग", "कोरबा", "जगदलपुर"].map((dist) => (
+                          <button
+                            key={dist}
+                            onClick={() => {
+                              setSelectedDistrict(dist);
+                              setSelectedCategory("all");
+                              setCustomFilter(null);
+                              setSelectedArticleId(null);
+                            }}
+                            className={`text-left text-xs py-1.5 transition-all hover:text-pink-650 dark:hover:text-pink-450 cursor-pointer ${
+                              selectedDistrict === dist
+                                ? "text-pink-600 dark:text-pink-400 font-extrabold"
+                                : "text-slate-500 dark:text-zinc-400 hover:translate-x-0.5 duration-200"
+                            }`}
+                          >
+                            ▸ {dist}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* 5. Select District Pink Button */}
@@ -1162,113 +1210,97 @@ export default function App() {
 
             {/* DYNAMIC VIEWS BASED ON CATEGORY FILTER */}
             {selectedCategory === "shorts" ? (
-              <div className="w-full max-w-md mx-auto py-2 sm:py-6 flex flex-col items-center gap-6 animate-fade-in pb-24">
-                <div className="text-center w-full flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
-                  <h2 className="font-display font-black text-sm sm:text-base text-brand-red dark:text-red-500 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="w-full max-w-md mx-auto py-2 sm:py-4 flex flex-col items-center gap-6 animate-fade-in pb-24 h-[80vh] overflow-y-auto snap-y snap-mandatory scroll-smooth no-scrollbar">
+                <div className="text-center w-full flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3 sticky top-0 bg-slate-100 dark:bg-zinc-950 z-30 px-2">
+                  <h2 className="font-display font-black text-sm sm:text-base text-brand-red dark:text-red-500 uppercase tracking-wider flex items-center gap-1.5 py-1">
                     <Layers className="w-5 h-5 text-brand-red animate-pulse" />
-                    <span>समाचार प्लस शॉर्ट्स ({activeShortIndex + 1}/{shortsList.length})</span>
+                    <span>समाचार प्लस शॉर्ट्स (Scroll to Explore)</span>
                   </h2>
                 </div>
 
                 {shortsList.length > 0 ? (
-                  <div className="w-full relative rounded-3xl overflow-hidden aspect-[9/16] max-h-[72vh] border border-slate-250 dark:border-zinc-800 shadow-2xl flex flex-col justify-between bg-zinc-900 group">
-                    {/* Background image & gradient overlay */}
-                    <div className="absolute inset-0 z-0">
-                      <img
-                        src={optimizeCloudinaryUrl(shortsList[activeShortIndex].image_url, 600)}
-                        alt="Short preview"
-                        className="w-full h-full object-cover opacity-80 group-hover:scale-101 transition-all duration-700"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-10" />
-                    </div>
+                  shortsList.map((short, idx) => (
+                    <div 
+                      key={short.id}
+                      className="w-full relative rounded-3xl overflow-hidden aspect-[9/16] h-[72vh] min-h-[500px] max-h-[720px] border border-slate-250 dark:border-zinc-800 shadow-2xl flex flex-col justify-between bg-zinc-900 group snap-start shrink-0 mb-6"
+                    >
+                      {/* Background image & gradient overlay */}
+                      <div className="absolute inset-0 z-0">
+                        <img
+                          src={optimizeCloudinaryUrl(short.image_url, 600)}
+                          alt="Short preview"
+                          className="w-full h-full object-cover opacity-80 group-hover:scale-101 transition-all duration-700"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-10" />
+                      </div>
 
-                    {/* Top category label */}
-                    <div className="absolute top-4 left-4 z-20">
-                      <span className="bg-brand-red text-white text-[9px] font-mono tracking-widest font-black uppercase px-2.5 py-0.5 rounded-md shadow-md">
-                        {categories.find((c) => c.id === shortsList[activeShortIndex].category)?.name_hi || "ताज़ा खबर"}
-                      </span>
-                    </div>
+                      {/* Top category label & short index count */}
+                      <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between">
+                        <span className="bg-brand-red text-white text-[9px] font-mono tracking-widest font-black uppercase px-2.5 py-0.5 rounded-md shadow-md">
+                          {categories.find((c) => c.id === short.category)?.name_hi || "ताज़ा खबर"}
+                        </span>
+                        <span className="bg-black/50 text-white text-[9px] font-mono px-2 py-0.5 rounded-full backdrop-blur-xs font-bold border border-white/10">
+                          {idx + 1} / {shortsList.length}
+                        </span>
+                      </div>
 
-                    {/* Content footer panel */}
-                    <div className="relative z-20 mt-auto p-5 sm:p-7 text-white text-left font-body flex flex-col gap-3">
-                      <h3 className="text-base sm:text-lg font-display font-black leading-tight tracking-tight drop-shadow-md text-white line-clamp-3">
-                        {shortsList[activeShortIndex].title}
-                      </h3>
-                      <p className="text-xs text-slate-250 leading-relaxed font-medium line-clamp-4 drop-shadow-sm bg-black/25 backdrop-blur-xs p-3 rounded-xl border border-white/5">
-                        {shortsList[activeShortIndex].summary || shortsList[activeShortIndex].content}
-                      </p>
+                      {/* Content footer panel */}
+                      <div className="relative z-20 mt-auto p-5 sm:p-7 text-white text-left font-body flex flex-col gap-3">
+                        <h3 className="text-base sm:text-lg font-display font-black leading-tight tracking-tight drop-shadow-md text-white line-clamp-3">
+                          {short.title}
+                        </h3>
+                        <p className="text-xs text-slate-250 leading-relaxed font-medium line-clamp-4 drop-shadow-sm bg-black/25 backdrop-blur-xs p-3 rounded-xl border border-white/5">
+                          {short.summary || short.content}
+                        </p>
 
-                      {/* Interaction Buttons row */}
-                      <div className="flex items-center justify-between gap-3 mt-3 pt-3.5 border-t border-white/10 z-20">
-                        <button
-                          onClick={() => setSelectedArticleId(shortsList[activeShortIndex].id)}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-brand-red hover:bg-[#9e0010] text-white text-2xs font-bold rounded-xl transition-all shadow-md cursor-pointer border border-brand-red/20 active:scale-95"
-                        >
-                          <Compass className="w-3.5 h-3.5" />
-                          <span>पूरा पढ़ें</span>
-                        </button>
-                        
-                        <div className="flex items-center gap-1.5">
+                        {/* Interaction Buttons row */}
+                        <div className="flex items-center justify-between gap-3 mt-3 pt-3.5 border-t border-white/10 z-20">
                           <button
-                            onClick={() => {
-                              const art = shortsList[activeShortIndex];
-                              const key = `reaction_${art.id}_like`;
-                              const prev = parseInt(localStorage.getItem(key) || "0");
-                              localStorage.setItem(key, String(prev + 1));
-                              localStorage.setItem(`reacted_${art.id}`, "like");
-                              alert("👍 पसंद! धन्यवाद।");
-                            }}
-                            className="p-2 bg-black/40 hover:bg-black/60 rounded-full border border-white/10 text-white flex items-center justify-center cursor-pointer transition-colors active:scale-95"
-                            title="पसंद करें"
+                            onClick={() => setSelectedArticleId(short.id)}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-brand-red hover:bg-[#9e0010] text-white text-2xs font-bold rounded-xl transition-all shadow-md cursor-pointer border border-brand-red/20 active:scale-95"
                           >
-                            <Heart className="w-4 h-4 text-rose-500 fill-current" />
+                            <Compass className="w-3.5 h-3.5" />
+                            <span>पूरा पढ़ें</span>
                           </button>
                           
-                          <button
-                            onClick={() => {
-                              const art = shortsList[activeShortIndex];
-                              const shareUrl = `${window.location.origin}/?article=${art.id}`;
-                              if (navigator.share) {
-                                navigator.share({ title: art.title, url: shareUrl });
-                              } else {
-                                window.open(`https://wa.me/?text=${encodeURIComponent(art.title + " " + shareUrl)}`, "_blank");
-                              }
-                            }}
-                            className="p-2 bg-black/40 hover:bg-black/60 rounded-full border border-white/10 text-white flex items-center justify-center cursor-pointer transition-colors active:scale-95"
-                            title="साझा करें"
-                          >
-                            <Share2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => {
+                                const key = `reaction_${short.id}_like`;
+                                const prev = parseInt(localStorage.getItem(key) || "0");
+                                localStorage.setItem(key, String(prev + 1));
+                                localStorage.setItem(`reacted_${short.id}`, "like");
+                                alert("👍 पसंद! धन्यवाद।");
+                              }}
+                              className="p-2 bg-black/40 hover:bg-black/60 rounded-full border border-white/10 text-white flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+                              title="पसंद करें"
+                            >
+                              <Heart className="w-4 h-4 text-rose-500 fill-current" />
+                            </button>
+                            
+                            <button
+                              onClick={() => {
+                                const shareUrl = `${window.location.origin}/?article=${short.id}`;
+                                if (navigator.share) {
+                                  navigator.share({ title: short.title, url: shareUrl });
+                                } else {
+                                  window.open(`https://wa.me/?text=${encodeURIComponent(short.title + " " + shareUrl)}`, "_blank");
+                                }
+                              }}
+                              className="p-2 bg-black/40 hover:bg-black/60 rounded-full border border-white/10 text-white flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+                              title="साझा करें"
+                            >
+                              <Share2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  ))
                 ) : (
                   <div className="text-center py-16 text-slate-400 font-body text-xs">
                     शॉर्ट्स के लिए कोई लेख उपलब्ध नहीं है।
-                  </div>
-                )}
-
-                {/* Previous / Next Slide controllers */}
-                {shortsList.length > 1 && (
-                  <div className="flex items-center gap-4 w-full text-xs font-mono font-bold">
-                    <button
-                      onClick={() => {
-                        setActiveShortIndex((prev) => (prev === 0 ? shortsList.length - 1 : prev - 1));
-                      }}
-                      className="flex-1 py-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-850 text-slate-750 dark:text-zinc-200 rounded-xl hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer shadow-xs transition-all active:scale-98 text-center animate-fade-in"
-                    >
-                      ◀ पिछला शॉर्ट
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveShortIndex((prev) => (prev + 1) % shortsList.length);
-                      }}
-                      className="flex-1 py-3 bg-brand-red hover:bg-[#9e0010] text-white rounded-xl shadow-md cursor-pointer transition-all active:scale-98 text-center border border-brand-red/25"
-                    >
-                      अगला शॉर्ट ▶
-                    </button>
                   </div>
                 )}
               </div>
@@ -1926,7 +1958,7 @@ export default function App() {
         <footer className="bg-[#e4e2e2] dark:bg-zinc-900 border-t border-gray-250 dark:border-zinc-800 py-10 px-4 sm:px-8 mt-12 transition-colors">
           <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="md:col-span-1 flex flex-col gap-3 font-body">
-              <span className="font-display font-extrabold text-[#e91e63] dark:text-pink-500 text-lg">Samachar Plus</span>
+              <span className="font-display font-extrabold text-[#e91e63] dark:text-pink-500 text-lg">{siteTitle}</span>
               <p className="text-xs text-brand-dark/70 dark:text-zinc-400 leading-normal">
                 विश्वसनीय और निष्पक्ष समाचार, 24/7। हिंदी जगत का सर्वश्रेष्ठ समाचार मंच।
               </p>
@@ -1970,7 +2002,7 @@ export default function App() {
           </div>
 
           <div className="max-w-7xl mx-auto mt-8 pt-4 border-t border-gray-300 dark:border-zinc-800 text-center text-xs text-gray-500 font-body">
-            © 2026 Samachar Plus. सर्वाधिकार सुरक्षित। • Built inside Cloud Native Applet Ecosystem
+            © 2026 {siteTitle}. सर्वाधिकार सुरक्षित। • Built inside Cloud Native Applet Ecosystem
           </div>
         </footer>
 

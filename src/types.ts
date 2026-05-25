@@ -19,6 +19,8 @@ export interface Article {
   summary?: string;
   likes_count?: number;
   is_featured?: boolean;
+  is_trending?: boolean;
+  district?: string | null;
 }
 
 export interface Category {

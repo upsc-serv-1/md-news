@@ -125,7 +125,7 @@ export const newsService = {
    * Fetches all articles from Supabase (or Local Storage if offline/unconfigured)
    * If showAll is false, it only returns published (or legacy null-status) articles.
    */
-  async getArticles(category?: string, showAll = false): Promise<Article[]> {
+  async getArticles(category?: string, showAll = false, from?: number, to?: number): Promise<Article[]> {
     const supabase = getSupabase();
     
     if (supabase) {
@@ -141,6 +141,10 @@ export const newsService = {
         
         if (category) {
           query = query.eq("category", category);
+        }
+
+        if (from !== undefined && to !== undefined) {
+          query = query.range(from, to);
         }
         
         const { data, error } = await query;
@@ -160,6 +164,10 @@ export const newsService = {
     }
     if (category) {
       articles = articles.filter((a) => a.category === category);
+    }
+
+    if (from !== undefined && to !== undefined) {
+      return articles.slice(from, to + 1);
     }
     return articles;
   },
@@ -202,21 +210,20 @@ export const newsService = {
 
     const supabase = getSupabase();
     if (supabase) {
-      try {
-        const { data, error } = await supabase.from("articles").insert([freshArticle]).select().single();
-        if (!error && data) {
-          // Sync to local storage
-          const local = getLocalArticles();
-          saveLocalArticles([data as Article, ...local]);
-          return data as Article;
-        }
-        console.error("Supabase create failed, fallback to local storage:", error);
-      } catch (err) {
-        console.error("Supabase create exception, fallback to local storage:", err);
+      const { data, error } = await supabase.from("articles").insert([freshArticle]).select().single();
+      if (error) {
+        console.error("Supabase create failed:", error);
+        throw new Error(`डेटाबेस एरर: ${error.message} (कृपया सुनिश्चित करें कि आपने SQL ब्लू प्रिंट तालिकाएं और RLS नीतियां Supabase में चला ली हैं)`);
+      }
+      if (data) {
+        // Sync to local storage
+        const local = getLocalArticles();
+        saveLocalArticles([data as Article, ...local]);
+        return data as Article;
       }
     }
 
-    // Fallback Code
+    // Fallback Code (if Supabase is not configured)
     const articles = getLocalArticles();
     const updated = [freshArticle, ...articles];
     saveLocalArticles(updated);
@@ -229,22 +236,21 @@ export const newsService = {
   async updateArticle(id: string, updates: Partial<Article>): Promise<Article> {
     const supabase = getSupabase();
     if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from("articles")
-          .update(updates)
-          .eq("id", id)
-          .select()
-          .single();
-        if (!error && data) {
-          // Sync to local storage
-          const local = getLocalArticles().map((a) => (a.id === id ? { ...a, ...data } : a));
-          saveLocalArticles(local);
-          return data as Article;
-        }
-        console.error("Supabase update failed, fallback to local storage:", error);
-      } catch (err) {
-        console.error("Supabase update exception, fallback to local storage:", err);
+      const { data, error } = await supabase
+        .from("articles")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) {
+        console.error("Supabase update failed:", error);
+        throw new Error(`डेटाबेस अपडेट एरर: ${error.message}`);
+      }
+      if (data) {
+        // Sync to local storage
+        const local = getLocalArticles().map((a) => (a.id === id ? { ...a, ...data } : a));
+        saveLocalArticles(local);
+        return data as Article;
       }
     }
 
@@ -265,18 +271,15 @@ export const newsService = {
   async deleteArticle(id: string): Promise<boolean> {
     const supabase = getSupabase();
     if (supabase) {
-      try {
-        const { error } = await supabase.from("articles").delete().eq("id", id);
-        if (!error) {
-          // Sync to local storage
-          const local = getLocalArticles().filter((a) => a.id !== id);
-          saveLocalArticles(local);
-          return true;
-        }
-        console.error("Supabase delete failed, fallback to local storage:", error);
-      } catch (err) {
-        console.error("Supabase delete exception, fallback to local storage:", err);
+      const { error } = await supabase.from("articles").delete().eq("id", id);
+      if (error) {
+        console.error("Supabase delete failed:", error);
+        throw new Error(`डेटाबेस डिलीट एरर: ${error.message}`);
       }
+      // Sync to local storage
+      const local = getLocalArticles().filter((a) => a.id !== id);
+      saveLocalArticles(local);
+      return true;
     }
 
     // Fallback Code
@@ -411,6 +414,59 @@ export const newsService = {
     const updated = [...comments, freshComment];
     saveLocalComments(updated);
     return freshComment;
+  },
+
+  async getAllComments(): Promise<(Comment & { article_title?: string })[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("comments")
+          .select(`
+            *,
+            articles:article_id (title)
+          `)
+          .order("created_at", { ascending: false });
+        if (!error && data) {
+          return data.map((c: any) => ({
+            ...c,
+            article_title: c.articles?.title || "अज्ञात लेख"
+          }));
+        }
+      } catch (err) {
+        console.error("Supabase fetch all comments failed", err);
+      }
+    }
+    const comments = getLocalComments();
+    const articles = getLocalArticles();
+    return comments.map((c) => {
+      const art = articles.find((a) => a.id === c.article_id);
+      return {
+        ...c,
+        article_title: art ? art.title : "अज्ञात लेख"
+      };
+    }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  },
+
+  async deleteComment(id: string): Promise<boolean> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase.from("comments").delete().eq("id", id);
+        if (!error) {
+          const local = getLocalComments().filter((c) => c.id !== id);
+          saveLocalComments(local);
+          return true;
+        }
+      } catch (err) {
+        console.error("Supabase delete comment failed", err);
+      }
+    }
+    const local = getLocalComments();
+    const filtered = local.filter((c) => c.id !== id);
+    if (filtered.length === local.length) return false;
+    saveLocalComments(filtered);
+    return true;
   },
 
   // -------------------------------------------------------------
@@ -609,5 +665,70 @@ export const newsService = {
       localStorage.setItem("samachar_plus_subscribers", JSON.stringify(emails));
     }
     return true;
+  },
+
+  // -------------------------------------------------------------
+  // SITE SETTINGS (saved to Supabase site_settings table, localStorage fallback)
+  // -------------------------------------------------------------
+
+  async saveSiteSettings(settings: { site_title: string; site_tagline: string; marquee_text: string; web_stories?: any[] }): Promise<boolean> {
+    // Always keep localStorage in sync as instant cache
+    localStorage.setItem("sp_site_title", settings.site_title);
+    localStorage.setItem("sp_site_tagline", settings.site_tagline);
+    localStorage.setItem("sp_site_marquee", settings.marquee_text);
+    if (settings.web_stories !== undefined) {
+      localStorage.setItem("sp_web_stories", JSON.stringify(settings.web_stories));
+    }
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from("site_settings")
+          .upsert([{ id: "global", ...settings, updated_at: new Date().toISOString() }], { onConflict: "id" });
+        if (!error) return true;
+        console.warn("site_settings upsert error (using localStorage fallback):", error.message);
+      } catch (e) {
+        console.warn("Supabase site_settings save failed (using localStorage fallback):", e);
+      }
+    }
+    return false; // Supabase unavailable — localStorage already updated above
+  },
+
+  async getSiteSettings(): Promise<{ site_title: string; site_tagline: string; marquee_text: string; web_stories?: any[] }> {
+    const defaults = {
+      site_title: localStorage.getItem("sp_site_title") || "समाचार प्लस",
+      site_tagline: localStorage.getItem("sp_site_tagline") || "Samachar Plus",
+      marquee_text: localStorage.getItem("sp_site_marquee") || "स्वागत है - समाचार प्लस पर!",
+      web_stories: JSON.parse(localStorage.getItem("sp_web_stories") || "null") || undefined,
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("site_settings")
+          .select("*")
+          .eq("id", "global")
+          .single();
+        if (!error && data) {
+          // Sync fetched values back to localStorage for offline use
+          localStorage.setItem("sp_site_title", data.site_title || defaults.site_title);
+          localStorage.setItem("sp_site_tagline", data.site_tagline || defaults.site_tagline);
+          localStorage.setItem("sp_site_marquee", data.marquee_text || defaults.marquee_text);
+          if (data.web_stories) localStorage.setItem("sp_web_stories", JSON.stringify(data.web_stories));
+          return {
+            site_title: data.site_title || defaults.site_title,
+            site_tagline: data.site_tagline || defaults.site_tagline,
+            marquee_text: data.marquee_text || defaults.marquee_text,
+            web_stories: data.web_stories || defaults.web_stories,
+          };
+        }
+      } catch (e) {
+        console.warn("Supabase site_settings fetch failed (using localStorage fallback):", e);
+      }
+    }
+    return defaults;
   }
 };
+

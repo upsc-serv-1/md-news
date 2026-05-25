@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Article, Category } from "../types";
 import { newsService, getSupabaseConfig, getSupabase } from "../lib/supabase";
 import { CATEGORIES } from "../data";
@@ -32,6 +32,7 @@ import {
   isCloudinaryConfigured,
   uploadToCloudinary
 } from "../lib/cloudinary";
+import { CHHATTISGARH_DISTRICTS } from "../App";
 
 
 interface AdminPanelProps {
@@ -59,7 +60,7 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
   const [loading, setLoading] = useState(true);
 
   // Form state (Insert/Update)
-  const [activeTab, setActiveTab] = useState<"dashboard" | "articles" | "supabase" | "ai" | "cloudinary" | "webstories" | "newsletter" | "reactions" | "site">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "articles" | "supabase" | "ai" | "cloudinary" | "webstories" | "newsletter" | "reactions" | "site" | "comments">("dashboard");
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
   const [deletingArticleId, setDeletingArticleId] = useState<string | null>(null);
@@ -168,6 +169,39 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
     }
     setReactionsLoading(false);
   };
+
+
+  // Comments Moderation State and helpers
+  const [commentsList, setCommentsList] = useState<any[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+
+  const loadComments = async () => {
+    setCommentsLoading(true);
+    try {
+      const data = await newsService.getAllComments();
+      setCommentsList(data || []);
+    } catch (e) {
+      console.error("Failed to load comments", e);
+    }
+    setCommentsLoading(false);
+  };
+
+  const handleDeleteComment = async (id: string) => {
+    if (window.confirm("क्या आप वाकई इस टिप्पणी को हटाना चाहते हैं?")) {
+      try {
+        const ok = await newsService.deleteComment(id);
+        if (ok) {
+          setCommentsList((prev) => prev.filter((c) => c.id !== id));
+          alert("टिप्पणी सफलतापूर्वक हटा दी गई है।");
+        } else {
+          alert("टिप्पणी हटाने में विफल।");
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
   const [syncMessage, setSyncMessage] = useState("");
   const [seedingStatus, setSeedingStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [seedingMessage, setSeedingMessage] = useState("");
@@ -232,6 +266,32 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
   const [formSummary, setFormSummary] = useState("");
   const [formScheduledFor, setFormScheduledFor] = useState("");
   const [formIsFeatured, setFormIsFeatured] = useState(false);
+  const [formIsTrending, setFormIsTrending] = useState(false);
+  const [formDistrict, setFormDistrict] = useState("");
+  const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
+
+  // Rich Text Editor ref and helpers
+  const editorRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    if (showFormModal && editorRef.current && editorRef.current.innerHTML !== formContent) {
+      editorRef.current.innerHTML = formContent;
+    }
+  }, [showFormModal, editingArticleId, formContent]);
+
+  const execEditorCommand = (command: string, value: string = "") => {
+    document.execCommand(command, false, value);
+    if (editorRef.current) {
+      setFormContent(editorRef.current.innerHTML);
+    }
+  };
+
+  const insertLink = () => {
+    const url = prompt("लिंक का URL दर्ज करें (उदा: https://example.com):");
+    if (url) {
+      execEditorCommand("createLink", url);
+    }
+  };
 
   // Load articles
   const loadArticlesList = async () => {
@@ -242,13 +302,42 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
   };
 
   useEffect(() => {
-    // Check local session
+    // Check local session and restore Supabase Auth session
     const status = localStorage.getItem("samachar_admin_auth");
     const savedEmail = localStorage.getItem("samachar_admin_email") || "";
     if (savedEmail) setEmail(savedEmail);
     if (status === "true") {
       setIsAuthenticated(true);
     }
+
+    const checkSession = async () => {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data.session && data.session.user) {
+            const userEmail = data.session.user.email || "";
+            setIsAuthenticated(true);
+            setEmail(userEmail);
+            localStorage.setItem("samachar_admin_auth", "true");
+            localStorage.setItem("samachar_admin_email", userEmail);
+            
+            // Sync user config
+            const aiConf = await aiService.getConfigFromServer(userEmail);
+            setAiProvider(aiConf.provider);
+            setAiApiKey(aiConf.apiKey);
+            setAiModel(aiConf.model);
+            setAiPresets(aiConf.presets);
+            setCategoryPresets(aiConf.categoryPresets || DEFAULT_CATEGORY_PRESETS);
+            setCategories(aiConf.categories || DEFAULT_CATEGORIES);
+            await checkSync(userEmail);
+          }
+        } catch (e) {
+          console.warn("Failed to restore Supabase session:", e);
+        }
+      }
+    };
+    checkSession();
 
     // Load credentials
     const conf = getSupabaseConfig();
@@ -260,6 +349,14 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
     setCldCloudName(cldConf.cloudName);
     setCldUploadPreset(cldConf.uploadPreset);
     setCldApiKey(cldConf.apiKey);
+
+    // Load site settings from Supabase (or localStorage fallback)
+    newsService.getSiteSettings().then(settings => {
+      setSiteTitle(settings.site_title);
+      setSiteTagline(settings.site_tagline);
+      setSiteMarquee(settings.marquee_text);
+      if (settings.web_stories) setWebStoriesAdmin(settings.web_stories);
+    });
 
     // Load AI configurations from Server/LocalStorage scoped per email
     if (savedEmail) {
@@ -295,39 +392,66 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
   // Handle Admin Authorization
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError("");
+    
     if (!email.trim() || !email.includes("@")) {
       setAuthError("कृपया अपना सही ईमेल पता दर्ज करें।");
       return;
     }
-    // Simply use 'admin123' as default password, or let any password work as prototype & instruct user
-    if (password === "admin" || password === "admin123") {
-      const activeEmail = email.trim().toLowerCase();
-      setIsAuthenticated(true);
-      localStorage.setItem("samachar_admin_auth", "true");
-      localStorage.setItem("samachar_admin_email", activeEmail);
-      setAuthError("");
 
-      // Fetch specific config for this logged-in email
-      setLoading(true);
-      const aiConf = await aiService.getConfigFromServer(activeEmail);
-      setAiProvider(aiConf.provider);
-      setAiApiKey(aiConf.apiKey);
-      setAiModel(aiConf.model);
-      setAiPresets(aiConf.presets);
-      setCategoryPresets(aiConf.categoryPresets || DEFAULT_CATEGORY_PRESETS);
-      setCategories(aiConf.categories || DEFAULT_CATEGORIES);
+    const supabase = getSupabase();
+    if (!supabase) {
+      setAuthError("Supabase कॉन्फ़िगर नहीं है! कृपया Supabase कनेक्शन की जाँच करें।");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password: password
+      });
+
+      if (error) {
+        setAuthError(`लॉगिन विफल: ${error.message}`);
+        setLoading(false);
+        return;
+      }
+
+      if (data && data.user) {
+        const activeEmail = data.user.email || email.trim().toLowerCase();
+        setIsAuthenticated(true);
+        localStorage.setItem("samachar_admin_auth", "true");
+        localStorage.setItem("samachar_admin_email", activeEmail);
+        setAuthError("");
+
+        // Fetch specific config for this logged-in email
+        const aiConf = await aiService.getConfigFromServer(activeEmail);
+        setAiProvider(aiConf.provider);
+        setAiApiKey(aiConf.apiKey);
+        setAiModel(aiConf.model);
+        setAiPresets(aiConf.presets);
+        setCategoryPresets(aiConf.categoryPresets || DEFAULT_CATEGORY_PRESETS);
+        setCategories(aiConf.categories || DEFAULT_CATEGORIES);
+        setLoading(false);
+        await checkSync(activeEmail);
+      }
+    } catch (err: any) {
+      setAuthError(`त्रुटि: ${err.message || err}`);
       setLoading(false);
-      await checkSync(activeEmail);
-    } else {
-      setAuthError("गलत पासवर्ड! कृपया 'admin123' का उपयोग करें।");
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsAuthenticated(false);
     localStorage.removeItem("samachar_admin_auth");
     localStorage.removeItem("samachar_admin_email");
     setEmail("");
+    
+    const supabase = getSupabase();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
   };
 
   // Save Supabase Configuration
@@ -491,6 +615,7 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
   // Open Form for Creation
   const handleOpenCreate = () => {
     setEditingArticleId(null);
+    setFormSubmitError(null);
     setFormTitle("");
     setFormContent("");
     setFormImageUrl("https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&q=80&w=600");
@@ -503,6 +628,8 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
     setFormSummary("");
     setFormScheduledFor("");
     setFormIsFeatured(false);
+    setFormIsTrending(false);
+    setFormDistrict("");
     setIsEditorFullscreen(false);
     setShowFormModal(true);
   };
@@ -510,6 +637,7 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
   // Open Form for Editing
   const handleOpenEdit = (art: Article) => {
     setEditingArticleId(art.id);
+    setFormSubmitError(null);
     setFormTitle(art.title);
     setFormContent(art.content);
     setFormImageUrl(art.image_url);
@@ -522,6 +650,8 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
     setFormSummary(art.summary || "");
     setFormScheduledFor(art.scheduled_for || "");
     setFormIsFeatured(!!art.is_featured);
+    setFormIsTrending(!!art.is_trending);
+    setFormDistrict(art.district || "");
     setIsEditorFullscreen(false);
     setShowFormModal(true);
   };
@@ -530,7 +660,8 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle || !formContent) return;
-
+    setFormSubmitError(null);
+ 
     const getFormattedDateHindi = () => {
       const months = [
         "जनवरी", "फरवरी", "मार्च", "अप्रैल", "मई", "जून",
@@ -539,7 +670,7 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
       const d = new Date();
       return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
     };
-
+ 
     const payload = {
       title: formTitle,
       content: formContent,
@@ -553,9 +684,11 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
       status: formStatus,
       summary: formSummary,
       scheduled_for: formStatus === "scheduled" ? formScheduledFor : undefined,
-      is_featured: formIsFeatured
+      is_featured: formIsFeatured,
+      is_trending: formIsTrending,
+      district: formDistrict || null
     };
-
+ 
     setLoading(true);
     try {
       if (editingArticleId) {
@@ -566,8 +699,9 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
       setShowFormModal(false);
       await loadArticlesList();
       if (onDataChanged) onDataChanged();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setFormSubmitError(err.message || "डेटाबेस में समाचार सहेजने में विफल। कृपया SQL/RLS नीतियों की जांच करें।");
     } finally {
       setLoading(false);
     }
@@ -581,6 +715,23 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
     setDeletingArticleId(null);
     await loadArticlesList();
     if (onDataChanged) onDataChanged();
+  };
+
+  // Instant checkbox setting toggles
+  const toggleArticleSetting = async (id: string, settingKey: "is_breaking" | "is_featured" | "is_trending", currentValue: boolean) => {
+    const newValue = !currentValue;
+    
+    // Optimistic UI state update
+    setArticles(prev => prev.map(a => a.id === id ? { ...a, [settingKey]: newValue } : a));
+    
+    try {
+      await newsService.updateArticle(id, { [settingKey]: newValue });
+      if (onDataChanged) onDataChanged();
+    } catch (err) {
+      console.error("Failed to toggle article setting:", err);
+      // Revert on error
+      setArticles(prev => prev.map(a => a.id === id ? { ...a, [settingKey]: currentValue } : a));
+    }
   };
 
   // Computed Stats
@@ -635,9 +786,10 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
               </label>
               <input
                 type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="उदा. admin123"
+                placeholder="••••••••"
                 className="w-full text-sm border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50 transition-all font-mono"
               />
             </div>
@@ -650,8 +802,8 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
             )}
 
             <div className="bg-gray-50 rounded-lg p-3 text-2xs text-gray-500 leading-normal border border-gray-100">
-              💡 **डेमो एक्सेस क्रेडेंशियल**:<br />
-              प्रशासक पासवर्ड के रूप में **`admin123`** का उपयोग करें। यह आपको संपूर्ण समाचार प्रबंधन (CRUD) और Supabase योजनाकार तक पहुंचा देगा।
+              🔒 **सुरक्षित लॉगिन**:<br />
+              यह व्यवस्थापक डैशबोर्ड Supabase Auth द्वारा सुरक्षित है। कृपया अपने पंजीकृत व्यवस्थापक ईमेल और पासवर्ड का उपयोग करके लॉगिन करें।
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -770,6 +922,14 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
           }`}
         >
           📧 न्यूज़लेटर ({subscribers.length})
+        </button>
+        <button
+          onClick={() => { setActiveTab("comments"); loadComments(); }}
+          className={`pb-2.5 px-4 font-bold border-b-2 transition-all ${
+            activeTab === "comments" ? "border-brand-red text-brand-red" : "border-transparent text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          💬 टिप्पणियाँ ({commentsList.length})
         </button>
         <button
           onClick={() => { setActiveTab("reactions"); loadReactions(); }}
@@ -958,49 +1118,58 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
                       <tr className="bg-gray-50 text-gray-500 uppercase font-mono text-[10px] tracking-wide border-b border-gray-200">
                         <th className="py-3 px-4">प्रकाशन शीर्षक & लेखक</th>
                         <th className="py-3 px-4">श्रेणी</th>
+                        <th className="py-3 px-4 text-center">ब्रेकिंग</th>
+                        <th className="py-3 px-4 text-center">मुख्य (Featured)</th>
+                        <th className="py-3 px-4 text-center">ट्रेंडिंग</th>
                         <th className="py-3 px-4 text-center">व्यूज</th>
-                        <th className="py-3 px-4 text-center">प्रकार</th>
                         <th className="py-3 px-4 text-right">कार्रवाई</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-150">
                       {filteredArticles.map((art) => (
                         <tr key={art.id} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="py-3.5 px-4 max-w-sm sm:max-w-md">
-                            <span className="font-bold text-gray-900 block line-clamp-1">{art.title}</span>
-                            <span className="text-[10px] font-mono text-gray-400 block mt-0.5">लेखक: {art.author || "प्रशासक"} • {art.published_at}</span>
+                          <td className="py-3.5 px-4 max-w-xs sm:max-w-sm">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-gray-900 block line-clamp-1">{art.title}</span>
+                              <span className="text-[10px] font-mono text-gray-400 block mt-0.5">लेखक: {art.author || "प्रशासक"} • {art.published_at}</span>
+                              {art.is_video && (
+                                <span className="mt-1 inline-flex w-max items-center gap-0.5 text-[8px] font-bold text-amber-600 bg-amber-50 px-1 rounded border border-amber-100">
+                                  <Video className="w-2.5 h-2.5" /> वीडियो ({art.video_duration || "03:00"})
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3.5 px-4 font-mono">
                             <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px]">
                               {categories.find((c) => c.id === art.category)?.name_hi || art.category}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-center font-mono font-bold text-gray-700">
-                            {art.views || 0}
+                          <td className="py-3.5 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={!!art.is_breaking}
+                              onChange={() => toggleArticleSetting(art.id, "is_breaking", !!art.is_breaking)}
+                              className="rounded border-gray-300 text-brand-red focus:ring-brand-red w-4 h-4 cursor-pointer"
+                            />
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                              {art.status === "draft" && (
-                                <span className="p-1 px-1.5 bg-gray-200 text-gray-750 text-[9px] rounded font-mono font-extrabold uppercase">
-                                  DRAFT
-                                </span>
-                              )}
-                              {art.status === "scheduled" && (
-                                <span className="p-1 px-1.5 bg-blue-100 text-blue-700 text-[9px] rounded font-mono font-extrabold uppercase" title={`Scheduled for ${art.scheduled_for}`}>
-                                  SCHEDULED
-                                </span>
-                              )}
-                              {art.is_breaking && (
-                                <span className="p-1 px-1.5 bg-brand-red/10 text-brand-red text-[9px] rounded font-mono font-extrabold uppercase animate-pulse">
-                                  BREAKING
-                                </span>
-                              )}
-                              {art.is_video && (
-                                <span className="p-1 px-1.5 bg-amber-50 text-amber-600 text-[9px] rounded font-mono font-extrabold flex items-center gap-0.5">
-                                  <Video className="w-2.5 h-2.5" /> VIDEO
-                                </span>
-                              )}
-                            </div>
+                            <input
+                              type="checkbox"
+                              checked={!!art.is_featured}
+                              onChange={() => toggleArticleSetting(art.id, "is_featured", !!art.is_featured)}
+                              className="rounded border-gray-300 text-brand-red focus:ring-brand-red w-4 h-4 cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={!!art.is_trending}
+                              onChange={() => toggleArticleSetting(art.id, "is_trending", !!art.is_trending)}
+                              className="rounded border-gray-300 text-brand-red focus:ring-brand-red w-4 h-4 cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-mono font-bold text-gray-700">
+                            {art.views || 0}
                           </td>
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
@@ -1984,6 +2153,77 @@ CREATE POLICY "Enable read/write for all users" ON public.editor_ai_settings
         </div>
       )}
 
+      {/* TAB 8.5: COMMENTS MODERATION */}
+      {activeTab === "comments" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-display font-extrabold text-base text-brand-dark">💬 टिप्पणियाँ (Comment Moderation)</h2>
+              <p className="text-xs text-gray-500 mt-0.5">साइट के सभी पाठकों की टिप्पणियों का प्रबंधन करें।</p>
+            </div>
+            <button
+              onClick={loadComments}
+              className="text-xs text-brand-red font-bold cursor-pointer hover:underline"
+            >
+              🔄 रिफ्रेश
+            </button>
+          </div>
+          {commentsLoading ? (
+            <div className="text-center py-10 text-gray-400 text-sm">लोड हो रहा है...</div>
+          ) : commentsList.length === 0 ? (
+            <div className="text-center py-12 bg-white border border-gray-200 rounded-xl">
+              <p className="text-2xl mb-2">💬</p>
+              <p className="text-gray-400 text-sm font-medium">अभी कोई टिप्पणी नहीं है।</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs font-body">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200 font-mono text-gray-500 text-[10px] uppercase font-bold">
+                      <th className="p-3 pl-4">पाठक</th>
+                      <th className="p-3">टिप्पणी</th>
+                      <th className="p-3">लेख</th>
+                      <th className="p-3">तारीख</th>
+                      <th className="p-3 text-right pr-4">कार्रवाई</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-150">
+                    {commentsList.map((com) => (
+                      <tr key={com.id} className="hover:bg-gray-50/50">
+                        <td className="p-3 pl-4">
+                          <span className="font-bold text-gray-800 block">{com.author_name}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">{com.author_email}</span>
+                        </td>
+                        <td className="p-3 text-gray-750 font-normal break-words max-w-xs">{com.content}</td>
+                        <td className="p-3 text-gray-600 font-medium max-w-xs truncate" title={com.article_title}>
+                          {com.article_title}
+                        </td>
+                        <td className="p-3 text-gray-400 font-mono text-[10px]">
+                          {new Date(com.created_at).toLocaleDateString("hi-IN", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </td>
+                        <td className="p-3 text-right pr-4">
+                          <button
+                            onClick={() => handleDeleteComment(com.id)}
+                            className="text-red-500 hover:text-red-700 font-bold hover:underline cursor-pointer transition-colors"
+                          >
+                            हटाएँ
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+      </div>
+    )}
+
       {/* TAB 9: SITE SETTINGS */}
       {activeTab === "site" && (
         <div className="space-y-6 max-w-2xl">
@@ -1992,7 +2232,17 @@ CREATE POLICY "Enable read/write for all users" ON public.editor_ai_settings
             <p className="text-xs text-gray-500 mt-0.5">पोर्टल का नाम, टैगलाइन और ब्रेकिंग न्यूज़ टिकर के डिफ़ॉल्ट टेक्स्ट नियंत्रित करें।</p>
           </div>
           <form
-            onSubmit={e => { e.preventDefault(); localStorage.setItem("sp_site_title", siteTitle); localStorage.setItem("sp_site_tagline", siteTagline); localStorage.setItem("sp_site_marquee", siteMarquee); setSiteSettingsSaved(true); setTimeout(() => setSiteSettingsSaved(false), 2500); }}
+            onSubmit={async e => {
+              e.preventDefault();
+              const saved = await newsService.saveSiteSettings({ site_title: siteTitle, site_tagline: siteTagline, marquee_text: siteMarquee });
+              setSiteSettingsSaved(true);
+              if (saved) {
+                setAiSavedMessage("✅ सेटिंग्स Supabase में सहेजी गई!");
+              } else {
+                setAiSavedMessage("📦 localStorage में सहेजा गया (Supabase ऑफलाइन)");
+              }
+              setTimeout(() => { setSiteSettingsSaved(false); setAiSavedMessage(""); }, 3000);
+            }}
             className="bg-white border border-gray-200 rounded-xl p-6 shadow-xs space-y-5"
           >
             <div>
@@ -2068,14 +2318,14 @@ CREATE POLICY "Enable read/write for all users" ON public.editor_ai_settings
 
               {!isEditorFullscreen && (
                 <>
-                  {/* Grid Category / Author */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Grid Category / Author / District */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-[11px] font-mono uppercase text-gray-500 mb-1">कैटेगरी</label>
+                      <label className="block text-[11px] font-mono uppercase text-gray-500 mb-1 font-bold">कैटेगरी</label>
                       <select
                         value={formCategory}
                         onChange={(e) => setFormCategory(e.target.value)}
-                        className="w-full border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50"
+                        className="w-full border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50 text-xs"
                       >
                         {categories.map((c) => (
                           <option key={c.id} value={c.id}>
@@ -2085,14 +2335,29 @@ CREATE POLICY "Enable read/write for all users" ON public.editor_ai_settings
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[11px] font-mono uppercase text-gray-500 mb-1">लेखक का नाम</label>
+                      <label className="block text-[11px] font-mono uppercase text-gray-500 mb-1 font-bold">जिला / शहर टैग (District Tag)</label>
+                      <select
+                        value={formDistrict}
+                        onChange={(e) => setFormDistrict(e.target.value)}
+                        className="w-full border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50 text-xs"
+                      >
+                        <option value="">कोई विशेष जिला नहीं (None)</option>
+                        {CHHATTISGARH_DISTRICTS.map((dist) => (
+                          <option key={dist} value={dist}>
+                            {dist}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-mono uppercase text-gray-500 mb-1 font-bold">लेखक का नाम</label>
                       <input
                         type="text"
                         required
                         value={formAuthor}
                         onChange={(e) => setFormAuthor(e.target.value)}
                         placeholder="उदा. विशेष संवाददाता"
-                        className="w-full text-sm border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50/50"
+                        className="w-full text-xs border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50/50"
                       />
                     </div>
                   </div>
@@ -2296,8 +2561,8 @@ CREATE POLICY "Enable read/write for all users" ON public.editor_ai_settings
                     />
                   </div>
 
-                  {/* Checkboxes for Breaking News, Video News & Featured Slider */}
-                  <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 border">
+                  {/* Checkboxes for Breaking News, Video News, Featured Slider & Trending */}
+                  <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-4 gap-4 border">
                     <label className="flex items-center gap-2 cursor-pointer font-label-bold">
                       <input
                         type="checkbox"
@@ -2305,7 +2570,7 @@ CREATE POLICY "Enable read/write for all users" ON public.editor_ai_settings
                         onChange={(e) => setFormIsBreaking(e.target.checked)}
                         className="rounded border-gray-300 text-brand-red focus:ring-brand-red w-4 h-4"
                       />
-                      <span>यह "ब्रेकिंग न्यूज़" अलर्ट है</span>
+                      <span>ब्रेकिंग न्यूज़ (Breaking)</span>
                     </label>
 
                     <label className="flex items-center gap-2 cursor-pointer font-label-bold">
@@ -2315,7 +2580,17 @@ CREATE POLICY "Enable read/write for all users" ON public.editor_ai_settings
                         onChange={(e) => setFormIsFeatured(e.target.checked)}
                         className="rounded border-gray-300 text-brand-red focus:ring-brand-red w-4 h-4"
                       />
-                      <span>मुख्य स्लाइडर (Featured Slider)</span>
+                      <span>मुख्य स्लाइडर (Featured)</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer font-label-bold">
+                      <input
+                        type="checkbox"
+                        checked={formIsTrending}
+                        onChange={(e) => setFormIsTrending(e.target.checked)}
+                        className="rounded border-gray-300 text-brand-red focus:ring-brand-red w-4 h-4"
+                      />
+                      <span>ट्रेंडिंग न्यूज़ (Trending)</span>
                     </label>
                     
                     <div className="space-y-2">
@@ -2396,17 +2671,109 @@ CREATE POLICY "Enable read/write for all users" ON public.editor_ai_settings
                   </div>
                 </div>
                 
-                <textarea
-                  rows={isEditorFullscreen ? 20 : 8}
-                  required
-                  value={formContent}
-                  onChange={(e) => setFormContent(e.target.value)}
-                  placeholder="समाचार की संपूर्ण रपट विस्तृत विवरण सहित यहाँ लिखें..."
-                  className={`w-full text-sm border border-gray-200 dark:border-zinc-700 outline-none focus:border-brand-red rounded-lg p-3 bg-gray-50/50 dark:bg-zinc-800/45 text-gray-800 dark:text-zinc-150 whitespace-pre-wrap leading-relaxed font-sans transition-all ${
-                    isEditorFullscreen ? "min-h-[50vh]" : ""
-                  }`}
-                />
+                <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-zinc-800/40">
+                  {/* WYSIWYG Toolbar */}
+                  <div className="bg-gray-100 dark:bg-zinc-800/80 border-b border-gray-200 dark:border-zinc-700 p-2 flex flex-wrap gap-1.5 select-none items-center">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); execEditorCommand("bold"); }}
+                      className="p-1.5 px-2.5 bg-white dark:bg-zinc-700 border dark:border-zinc-650 hover:bg-gray-50 dark:hover:bg-zinc-600 rounded text-xs font-bold text-gray-700 dark:text-zinc-200 cursor-pointer shadow-3xs hover:scale-101 active:scale-99 transition-all"
+                      title="गहरा (Bold)"
+                    >
+                      B
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); execEditorCommand("italic"); }}
+                      className="p-1.5 px-2.5 bg-white dark:bg-zinc-700 border dark:border-zinc-650 hover:bg-gray-50 dark:hover:bg-zinc-600 rounded text-xs italic text-gray-700 dark:text-zinc-200 cursor-pointer shadow-3xs hover:scale-101 active:scale-99 transition-all"
+                      title="तिरछा (Italic)"
+                    >
+                      I
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); execEditorCommand("underline"); }}
+                      className="p-1.5 px-2.5 bg-white dark:bg-zinc-700 border dark:border-zinc-650 hover:bg-gray-50 dark:hover:bg-zinc-600 rounded text-xs underline text-gray-700 dark:text-zinc-200 cursor-pointer shadow-3xs hover:scale-101 active:scale-99 transition-all"
+                      title="रेखांकित (Underline)"
+                    >
+                      U
+                    </button>
+                    <div className="w-px h-5 bg-gray-250 dark:bg-zinc-700 mx-1" />
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); execEditorCommand("formatBlock", "<h1>"); }}
+                      className="p-1.5 px-2.5 bg-white dark:bg-zinc-700 border dark:border-zinc-650 hover:bg-gray-50 dark:hover:bg-zinc-600 rounded text-xs font-bold text-gray-700 dark:text-zinc-200 cursor-pointer shadow-3xs hover:scale-101 active:scale-99 transition-all"
+                      title="बड़ा शीर्षक (H1)"
+                    >
+                      H1
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); execEditorCommand("formatBlock", "<h2>"); }}
+                      className="p-1.5 px-2.5 bg-white dark:bg-zinc-700 border dark:border-zinc-650 hover:bg-gray-50 dark:hover:bg-zinc-600 rounded text-xs font-bold text-gray-700 dark:text-zinc-200 cursor-pointer shadow-3xs hover:scale-101 active:scale-99 transition-all"
+                      title="मध्यम शीर्षक (H2)"
+                    >
+                      H2
+                    </button>
+                    <div className="w-px h-5 bg-gray-250 dark:bg-zinc-700 mx-1" />
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); execEditorCommand("insertUnorderedList"); }}
+                      className="p-1.5 px-2.5 bg-white dark:bg-zinc-700 border dark:border-zinc-650 hover:bg-gray-50 dark:hover:bg-zinc-600 rounded text-xs text-gray-700 dark:text-zinc-200 cursor-pointer shadow-3xs hover:scale-101 active:scale-99 transition-all"
+                      title="बिंदु सूची (Bullet List)"
+                    >
+                      • सूची
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); execEditorCommand("insertOrderedList"); }}
+                      className="p-1.5 px-2.5 bg-white dark:bg-zinc-700 border dark:border-zinc-650 hover:bg-gray-50 dark:hover:bg-zinc-600 rounded text-xs text-gray-700 dark:text-zinc-200 cursor-pointer shadow-3xs hover:scale-101 active:scale-99 transition-all"
+                      title="क्रमवार सूची (Numbered List)"
+                    >
+                      1. सूची
+                    </button>
+                    <div className="w-px h-5 bg-gray-250 dark:bg-zinc-700 mx-1" />
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); insertLink(); }}
+                      className="p-1.5 px-2.5 bg-white dark:bg-zinc-700 border dark:border-zinc-650 hover:bg-gray-50 dark:hover:bg-zinc-600 rounded text-xs text-gray-700 dark:text-zinc-200 cursor-pointer shadow-3xs hover:scale-101 active:scale-99 transition-all flex items-center gap-1"
+                      title="हाइपरलिंक जोड़ें (Insert Link)"
+                    >
+                      🔗 लिंक
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); execEditorCommand("removeFormat"); }}
+                      className="p-1.5 px-2.5 bg-white dark:bg-zinc-700 border dark:border-zinc-650 hover:bg-gray-50 dark:hover:bg-zinc-600 rounded text-xs text-red-500 cursor-pointer shadow-3xs hover:scale-101 active:scale-99 transition-all"
+                      title="फ़ॉर्मेटिंग साफ़ करें (Clear Formatting)"
+                    >
+                      साफ़
+                    </button>
+                  </div>
+
+                  {/* WYSIWYG Editing Field */}
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    onInput={(e) => setFormContent((e.target as HTMLDivElement).innerHTML)}
+                    placeholder="समाचार की संपूर्ण रपट विस्तृत विवरण सहित यहाँ लिखें..."
+                    className={`w-full outline-none p-3 bg-transparent text-gray-800 dark:text-zinc-150 leading-relaxed font-sans min-h-[180px] overflow-y-auto max-h-[60vh] prose dark:prose-invert max-w-none ${
+                      isEditorFullscreen ? "min-h-[50vh]" : ""
+                    }`}
+                    style={{ minHeight: isEditorFullscreen ? "450px" : "180px" }}
+                  />
+                </div>
               </div>
+
+               {formSubmitError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-start gap-2 text-[11px] leading-normal font-sans">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                  <div>
+                    <span className="font-bold block text-red-800">डेटाबेस एरर: समाचार सहेजने में विफल</span>
+                    <span>{formSubmitError}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-2.5 pt-3 border-t">
