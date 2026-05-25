@@ -163,6 +163,10 @@ export default function ArticleDetail({ articleId, onClose, onArticleUpdated }: 
                   alt={article.title}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&q=80&w=800";
+                  }}
                 />
                 {article.is_video && (
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center">

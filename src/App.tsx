@@ -22,12 +22,17 @@ import {
   Film,
   Menu,
   Sun,
-  Moon
+  Moon,
+  CloudSun,
+  CloudRain,
+  Hash
 } from "lucide-react";
 import ArticleDetail from "./components/ArticleDetail";
 import AdminPanel from "./components/AdminPanel";
 import { AnimatePresence, motion } from "motion/react";
 import { optimizeCloudinaryUrl } from "./lib/cloudinary";
+
+export const DEFAULT_NEWS_IMAGE = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&q=80&w=800";
 
 export const CHHATTISGARH_DISTRICTS = [
   "रायपुर", "बिलासपुर", "दुर्ग", "भिलाई", "कोरबा", "राजनांदगांव", "रायगढ़", "जगदलपुर",
@@ -171,7 +176,7 @@ export default function App() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const [isDistrictCollapsed, setIsDistrictCollapsed] = useState(false);
+  const [isDistrictCollapsed, setIsDistrictCollapsed] = useState(true);
 
   // Carousel slider state
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -1027,23 +1032,7 @@ export default function App() {
                     <span>छत्तीसगढ़ सरकार</span>
                   </button>
 
-                  {/* 3. राजनीति */}
-                  <button
-                    onClick={() => {
-                      setSelectedCategory("politics");
-                      setCustomFilter(null);
-                      setSelectedDistrict(null);
-                      setSelectedArticleId(null);
-                    }}
-                    className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                      selectedCategory === "politics" && !customFilter
-                        ? "bg-pink-50 text-pink-600 dark:bg-pink-950/20 font-extrabold border-l-4 border-pink-600 pl-2"
-                        : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 hover:text-pink-600 dark:hover:text-pink-400"
-                    }`}
-                  >
-                    <Building className="w-4 h-4 text-pink-500" />
-                    <span>राजनीति</span>
-                  </button>
+
 
                   {/* 4. आपका जिला (Jaipur, Jodhpur, etc.) */}
                   <div className="flex flex-col">
@@ -1114,42 +1103,6 @@ export default function App() {
                     <span>क्राइम</span>
                   </button>
 
-                  {/* 7. वेब स्टोरीज */}
-                  <button
-                    onClick={() => {
-                      setSelectedCategory("stories");
-                      setCustomFilter(null);
-                      setSelectedDistrict(null);
-                      setSelectedArticleId(null);
-                    }}
-                    className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                      selectedCategory === "stories" && !customFilter
-                        ? "bg-pink-50 text-pink-600 dark:bg-pink-950/20 font-extrabold border-l-4 border-pink-600 pl-2"
-                        : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 hover:text-pink-600 dark:hover:text-pink-400"
-                    }`}
-                  >
-                    <BookOpen className="w-4 h-4 text-pink-500" />
-                    <span>वेब स्टोरीज</span>
-                  </button>
-
-                  {/* 8. वायरल */}
-                  <button
-                    onClick={() => {
-                      setSelectedCategory("trending");
-                      setCustomFilter(null);
-                      setSelectedDistrict(null);
-                      setSelectedArticleId(null);
-                    }}
-                    className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                      selectedCategory === "trending" && !customFilter
-                        ? "bg-pink-50 text-pink-600 dark:bg-pink-950/20 font-extrabold border-l-4 border-pink-600 pl-2"
-                        : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 hover:text-pink-600 dark:hover:text-pink-400"
-                    }`}
-                  >
-                    <Flame className="w-4 h-4 text-pink-500 animate-pulse" />
-                    <span>वायरल</span>
-                  </button>
-
                   {/* 9. नौकरी/शिक्षा */}
                   <button
                     onClick={() => {
@@ -1185,6 +1138,73 @@ export default function App() {
                     <Compass className="w-4 h-4 text-pink-500" />
                     <span>छत्तीसगढ़ टूरिज्म</span>
                   </button>
+
+                  {/* WEATHER WIDGET */}
+                  <div className="border-t border-slate-100 dark:border-zinc-800/80 my-4 pt-4 px-1.5 font-body">
+                    <span className="text-[10px] font-mono tracking-widest text-slate-400 dark:text-zinc-500 uppercase font-black block mb-2.5">छत्तीसगढ़ मौसम (Weather)</span>
+                    <div className="bg-gradient-to-br from-pink-50/50 to-amber-50/20 dark:from-zinc-900/40 dark:to-zinc-850/20 rounded-xl p-3 border border-pink-100/30 dark:border-zinc-800 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CloudRain className="w-5 h-5 text-pink-550 animate-bounce" />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-850 dark:text-zinc-200">रायपुर (Raipur)</span>
+                            <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">हल्की बारिश (Rainy)</span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-black text-pink-600 dark:text-pink-400">31°C</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-slate-100 dark:border-zinc-800/60 pt-2 mt-1">
+                        <div className="flex items-center gap-2">
+                          <CloudSun className="w-5 h-5 text-amber-500" />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-850 dark:text-zinc-200">बिलासपुर (Bilaspur)</span>
+                            <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">आंशिक बादल (Cloudy)</span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-black text-pink-600 dark:text-pink-400">33°C</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-slate-100 dark:border-zinc-800/60 pt-2 mt-1">
+                        <div className="flex items-center gap-2">
+                          <Sun className="w-5 h-5 text-orange-500" style={{ animation: "spin 12s linear infinite" }} />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-850 dark:text-zinc-200">बस्तर (Bastar)</span>
+                            <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">धूप (Sunny)</span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-black text-pink-600 dark:text-pink-400">29°C</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TRENDING TAGS PANEL */}
+                  <div className="border-t border-slate-100 dark:border-zinc-800/80 my-4 pt-4 px-1.5 font-body">
+                    <span className="text-[10px] font-mono tracking-widest text-slate-400 dark:text-zinc-500 uppercase font-black block mb-2.5">ट्रेंडिंग विषय (Trending)</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: "छत्तीसगढ़_मानसून", query: "मानसून" },
+                        { label: "परीक्षा_भर्ती", query: "भर्ती" },
+                        { label: "चित्रकोट_जलप्रपात", query: "चित्रकोट" },
+                        { label: "भूपेश_बघेल", query: "बघेल" },
+                        { label: "रायपुर_विकास", query: "रायपुर" },
+                        { label: "नौकरी_2026", query: "नौकरी" }
+                      ].map((tag) => (
+                        <button
+                          key={tag.label}
+                          onClick={() => {
+                            setSearchQuery(tag.query);
+                            setIsSearchOpen(true);
+                            setSelectedCategory("all");
+                            setCustomFilter(null);
+                            setSelectedArticleId(null);
+                          }}
+                          className="flex items-center gap-0.5 px-2 py-1 rounded-lg bg-slate-50 hover:bg-pink-50 hover:text-pink-600 dark:bg-zinc-850 dark:hover:bg-zinc-800 dark:hover:text-pink-400 text-[10px] font-bold text-slate-600 dark:text-zinc-350 border border-slate-150 dark:border-zinc-800 transition-all cursor-pointer hover:scale-102"
+                        >
+                          <Hash className="w-2.5 h-2.5 text-pink-500" />
+                          <span>{tag.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
                 </div>
               </aside>
@@ -1231,7 +1251,10 @@ export default function App() {
                           alt="Short preview"
                           className="w-full h-full object-cover opacity-80 group-hover:scale-101 transition-all duration-700"
                           referrerPolicy="no-referrer"
-                        />
+                         onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-10" />
                       </div>
 
@@ -1328,7 +1351,10 @@ export default function App() {
                         alt={story.title}
                         className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700"
                         referrerPolicy="no-referrer"
-                      />
+                       onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                       {/* Deep gradient overlay */}
                       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent z-10" />
                       
@@ -1371,6 +1397,10 @@ export default function App() {
                                   alt={slideArt.title}
                                   className="w-full h-full object-cover transition-transform duration-[1200ms] cubic-bezier(0.16, 1, 0.3, 1) group-hover:scale-104"
                                   referrerPolicy="no-referrer"
+                                  onError={(e) => {
+                                    e.currentTarget.onerror = null;
+                                    e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                  }}
                                 />
                                 {/* Deeper gradient overlay for excellent text legibility */}
                                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-10" />
@@ -1439,6 +1469,62 @@ export default function App() {
                       </div>
                     )}
 
+                    {/* BELOW HERO: Today's Top Headlines Strip */}
+                    {filteredArticles.length > 0 && (
+                      <div className="lg:col-span-8 flex flex-col gap-3 mt-1 animate-fade-in">
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 bg-brand-red text-white text-[9px] font-mono font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md shadow-xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                              आज की सुर्खियाँ
+                            </span>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono tracking-wider">Today's Headlines</span>
+                          </div>
+                          <button
+                            onClick={() => { setSelectedCategory("all"); setCustomFilter(null); }}
+                            className="text-[10px] font-bold text-brand-red dark:text-red-400 hover:underline font-body cursor-pointer select-none"
+                          >
+                            सभी देखें →
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          {filteredArticles.slice(0, 4).map((art, idx) => (
+                            <a
+                              key={art.id}
+                              onClick={() => setSelectedArticleId(art.id)}
+                              className="group flex gap-2.5 cursor-pointer bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-xl p-2.5 hover:shadow-sm hover:border-pink-100 dark:hover:border-zinc-700 transition-all duration-200 hover:-translate-y-0.5"
+                            >
+                              {/* Number badge */}
+                              <div className="shrink-0 w-7 h-7 rounded-lg bg-red-50 dark:bg-red-500/10 flex items-center justify-center border border-red-100 dark:border-red-500/20">
+                                <span className="text-xs font-black text-brand-red dark:text-red-400 font-mono">{idx + 1}</span>
+                              </div>
+                              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                <span className="text-[9px] font-mono font-black text-brand-red dark:text-red-400 uppercase tracking-wider">
+                                  {categories.find(c => c.id === art.category)?.name_hi || "ताज़ा"}
+                                </span>
+                                <h3 className="text-[11px] font-bold text-slate-800 dark:text-zinc-100 group-hover:text-brand-red transition-colors line-clamp-2 leading-snug font-body">
+                                  {art.title}
+                                </h3>
+                                <span className="text-[9px] text-slate-400 dark:text-zinc-500 font-mono flex items-center gap-0.5 mt-0.5">
+                                  <Eye className="w-2.5 h-2.5" /> {art.views || 0}
+                                </span>
+                              </div>
+                              <div className="shrink-0 w-16 h-14 rounded-lg overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-100 dark:border-zinc-800">
+                                <img
+                                  src={optimizeCloudinaryUrl(art.image_url, 120)}
+                                  alt={art.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                  referrerPolicy="no-referrer"
+                                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_NEWS_IMAGE; }}
+                                />
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* RHS Columns: Recent updates news & Ads */}
                     <div className="lg:col-span-4 flex flex-col gap-4">
                       <h2 className="text-sm font-display font-black text-brand-red dark:text-red-500 border-b border-slate-200 dark:border-zinc-800 pb-2.5 uppercase tracking-wider flex items-center justify-between">
@@ -1463,7 +1549,10 @@ export default function App() {
                                   alt={art.title}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                   referrerPolicy="no-referrer"
-                                />
+                                 onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                                 {art.is_video && (
                                   <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
                                     <Video className="w-5 h-5 text-white drop-shadow-md" />
@@ -1522,7 +1611,10 @@ export default function App() {
                             alt={story.title}
                             className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700"
                             referrerPolicy="no-referrer"
-                          />
+                           onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                           {/* Deep gradient overlay */}
                           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent z-10" />
                           
@@ -1603,7 +1695,10 @@ export default function App() {
                               alt={art.title}
                               className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-[700ms] ease-out"
                               referrerPolicy="no-referrer"
-                            />
+                             onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                             <span className="absolute top-3 left-3 bg-brand-red text-white font-mono text-[9px] uppercase font-black px-2 py-0.5 rounded-md shadow-xs">
                               PICK
                             </span>
@@ -1654,7 +1749,10 @@ export default function App() {
                               alt={art.title}
                               className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
                               referrerPolicy="no-referrer"
-                            />
+                             onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                           </div>
                           <div className="p-3.5 flex-grow flex flex-col justify-between font-body">
                             <h3 className="text-xs font-bold text-slate-800 dark:text-zinc-100 group-hover:text-brand-red line-clamp-2 leading-snug">
@@ -1702,7 +1800,10 @@ export default function App() {
                               alt={video.title}
                               className="w-full h-full object-cover opacity-75 group-hover:scale-102 transition-transform duration-500"
                               referrerPolicy="no-referrer"
-                            />
+                             onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                             <div className="absolute inset-0 flex items-center justify-center">
                               <span className="w-12 h-12 rounded-full bg-brand-red flex items-center justify-center text-white opacity-90 group-hover:opacity-100 group-hover:scale-110 shadow-lg transition-all">
                                 <Video className="w-5 h-5 fill-current" />
@@ -1752,7 +1853,10 @@ export default function App() {
                               alt={art.title}
                               className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
                               referrerPolicy="no-referrer"
-                            />
+                             onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                           </div>
                           <div className="flex flex-col justify-between font-body flex-grow min-w-0">
                             <div>
@@ -1802,7 +1906,10 @@ export default function App() {
                             alt={art.title}
                             className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
                             referrerPolicy="no-referrer"
-                          />
+                           onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                           {art.is_video && (
                             <div className="absolute top-2 left-2 bg-black/80 text-white rounded-full p-1 border border-white/10 flex items-center justify-center">
                               <Video className="w-3 h-3 text-brand-red" />
@@ -1900,7 +2007,10 @@ export default function App() {
                           className="flex gap-3 p-2 hover:bg-gray-50/70 dark:hover:bg-zinc-800/50 rounded-lg cursor-pointer transition-colors text-left"
                         >
                           <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden shrink-0 border">
-                            <img src={art.image_url} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <img src={art.image_url} className="w-full h-full object-cover" referrerPolicy="no-referrer"  onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                           </div>
                           <div className="flex flex-col justify-center">
                             <span className="font-bold text-gray-900 dark:text-zinc-100 line-clamp-1">{art.title}</span>
@@ -2199,7 +2309,10 @@ export default function App() {
                     alt="Slide background"
                     className="w-full h-full object-cover opacity-90 transition-all duration-500 ease-out"
                     referrerPolicy="no-referrer"
-                  />
+                   onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
                   {/* Backdrop gradient masks */}
                   <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-black/80 to-transparent z-10" />
                   <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />
