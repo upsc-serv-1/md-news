@@ -1376,9 +1376,10 @@ export default function App() {
                 {/* DISPLAY HERO BLOCK ONLY WHEN FEED IS NOT FILTERED */}
                 {selectedCategory === "all" && (
                   <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
-                    {/* LHS Highlight Banner / Carousel */}
+                    {/* LHS Column: Hero Slider + Headlines Strip */}
+                    <div className="lg:col-span-8 flex flex-col gap-4">
                     {finalSliderArticles.length > 0 && (
-                      <div className="lg:col-span-8 relative overflow-hidden rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-md aspect-[16/9] w-full bg-slate-105 dark:bg-zinc-900 group">
+                      <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-md aspect-[16/9] w-full bg-slate-105 dark:bg-zinc-900 group">
                         <AnimatePresence mode="wait">
                           {finalSliderArticles.map((slideArt, index) => {
                             if (index !== activeSlideIndex) return null;
@@ -1471,7 +1472,7 @@ export default function App() {
 
                     {/* BELOW HERO: Today's Top Headlines Strip */}
                     {filteredArticles.length > 0 && (
-                      <div className="lg:col-span-8 flex flex-col gap-3 mt-1 animate-fade-in">
+                      <div className="flex flex-col gap-3 animate-fade-in">
                         <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-2">
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1.5 bg-brand-red text-white text-[9px] font-mono font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md shadow-xs">
@@ -1524,6 +1525,7 @@ export default function App() {
                         </div>
                       </div>
                     )}
+                    </div>{/* end LHS col-span-8 */}
 
                     {/* RHS Columns: Recent updates news & Ads */}
                     <div className="lg:col-span-4 flex flex-col gap-4">
