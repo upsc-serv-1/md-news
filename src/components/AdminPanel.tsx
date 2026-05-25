@@ -59,7 +59,7 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
   const [loading, setLoading] = useState(true);
 
   // Form state (Insert/Update)
-  const [activeTab, setActiveTab] = useState<"dashboard" | "articles" | "supabase" | "ai" | "cloudinary">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "articles" | "supabase" | "ai" | "cloudinary" | "webstories" | "newsletter" | "reactions" | "site">("dashboard");
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
   const [deletingArticleId, setDeletingArticleId] = useState<string | null>(null);
@@ -98,6 +98,76 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
 
   // Server Sync Check States
   const [syncStatus, setSyncStatus] = useState<"connected" | "table_missing" | "unconfigured" | "error" | "checking">("checking");
+
+  // Site settings state
+  const [siteTitle, setSiteTitle] = useState(() => localStorage.getItem("sp_site_title") || "समाचार प्लस");
+  const [siteTagline, setSiteTagline] = useState(() => localStorage.getItem("sp_site_tagline") || "Samachar Plus");
+  const [siteMarquee, setSiteMarquee] = useState(() => localStorage.getItem("sp_site_marquee") || "स्वागत है - समाचार प्लस पर!");
+  const [siteSettingsSaved, setSiteSettingsSaved] = useState(false);
+
+  // Newsletter subscribers state
+  const [subscribers, setSubscribers] = useState<{email: string; created_at?: string}[]>([]);
+  const [subsLoading, setSubsLoading] = useState(false);
+
+  // Reactions state
+  const [reactionStats, setReactionStats] = useState<{article_id: string; title: string; like: number; love: number; wow: number; sad: number}[]>([]);
+  const [reactionsLoading, setReactionsLoading] = useState(false);
+
+  // Web stories admin state
+  type WebSlide = { image: string; caption: string };
+  type WebStoryAdmin = { id: string; title: string; coverImage: string; slides: WebSlide[] };
+  const defaultStories: WebStoryAdmin[] = JSON.parse(localStorage.getItem("sp_web_stories") || "null") || [
+    { id: "story-1", title: "छत्तीसगढ़ मौसम: रायपुर, बिलासपुर समेत 15 जिलों में भारी बारिश का रेड अलर्ट", coverImage: "https://images.unsplash.com/photo-1504370805625-d34c54b34b00?auto=format&fit=crop&q=80&w=600", slides: [{ image: "https://images.unsplash.com/photo-1504370805625-d34c54b34b00?auto=format&fit=crop&q=80&w=600", caption: "मौसम विभाग ने रायपुर, बिलासपुर और दुर्ग में अगले दो दिनों के लिए भारी वज्रपात और अतिवृष्टि की चेतावनी जारी की है।" }] },
+    { id: "story-2", title: "चित्रकोट जलप्रपात", coverImage: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=600", slides: [{ image: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=600", caption: "बस्तर के प्रसिद्ध जलप्रपात पर इस मानसून रिकॉर्ड सैलानियों का जमावड़ा रहा।" }] }
+  ];
+  const [webStoriesAdmin, setWebStoriesAdmin] = useState<WebStoryAdmin[]>(defaultStories);
+  const [showStoryForm, setShowStoryForm] = useState(false);
+  const [editingStoryIdx, setEditingStoryIdx] = useState<number | null>(null);
+  const [storyFormTitle, setStoryFormTitle] = useState("");
+  const [storyFormCover, setStoryFormCover] = useState("");
+  const [storyFormSlides, setStoryFormSlides] = useState<WebSlide[]>([{ image: "", caption: "" }]);
+
+  const saveWebStories = (stories: WebStoryAdmin[]) => {
+    localStorage.setItem("sp_web_stories", JSON.stringify(stories));
+    setWebStoriesAdmin(stories);
+  };
+
+  const handleStorySubmit = () => {
+    if (!storyFormTitle.trim() || !storyFormCover.trim()) return;
+    const newStory: WebStoryAdmin = { id: editingStoryIdx !== null ? webStoriesAdmin[editingStoryIdx].id : `story-${Date.now()}`, title: storyFormTitle, coverImage: storyFormCover, slides: storyFormSlides.filter(s => s.image.trim()) };
+    const updated = editingStoryIdx !== null ? webStoriesAdmin.map((s, i) => i === editingStoryIdx ? newStory : s) : [...webStoriesAdmin, newStory];
+    saveWebStories(updated);
+    setShowStoryForm(false);
+    setEditingStoryIdx(null);
+    setStoryFormTitle(""); setStoryFormCover(""); setStoryFormSlides([{ image: "", caption: "" }]);
+  };
+
+  const loadSubscribers = async () => {
+    setSubsLoading(true);
+    const sb = getSupabase();
+    if (sb) {
+      const { data } = await sb.from("subscribers").select("email, created_at").order("created_at", { ascending: false });
+      setSubscribers(data || []);
+    }
+    setSubsLoading(false);
+  };
+
+  const loadReactions = async () => {
+    setReactionsLoading(true);
+    const sb = getSupabase();
+    if (sb) {
+      const { data: arts } = await sb.from("articles").select("id, title").limit(50);
+      const { data: rxns } = await sb.from("reactions").select("article_id, emoji_type");
+      if (arts && rxns) {
+        const stats = arts.map((a: any) => {
+          const artRxns = rxns.filter((r: any) => r.article_id === a.id);
+          return { article_id: a.id, title: a.title, like: artRxns.filter((r: any) => r.emoji_type === "like").length, love: artRxns.filter((r: any) => r.emoji_type === "love").length, wow: artRxns.filter((r: any) => r.emoji_type === "wow").length, sad: artRxns.filter((r: any) => r.emoji_type === "sad").length };
+        }).filter((s: any) => s.like + s.love + s.wow + s.sad > 0);
+        setReactionStats(stats);
+      }
+    }
+    setReactionsLoading(false);
+  };
   const [syncMessage, setSyncMessage] = useState("");
   const [seedingStatus, setSeedingStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [seedingMessage, setSeedingMessage] = useState("");
@@ -684,6 +754,38 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
           }`}
         >
           <Cloud className="w-3.5 h-3.5" /> Cloudinary सेटिंग्स
+        </button>
+        <button
+          onClick={() => setActiveTab("webstories")}
+          className={`pb-2.5 px-4 font-bold border-b-2 transition-all ${
+            activeTab === "webstories" ? "border-brand-red text-brand-red" : "border-transparent text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          📸 वेब स्टोरीज
+        </button>
+        <button
+          onClick={() => { setActiveTab("newsletter"); loadSubscribers(); }}
+          className={`pb-2.5 px-4 font-bold border-b-2 transition-all ${
+            activeTab === "newsletter" ? "border-brand-red text-brand-red" : "border-transparent text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          📧 न्यूज़लेटर ({subscribers.length})
+        </button>
+        <button
+          onClick={() => { setActiveTab("reactions"); loadReactions(); }}
+          className={`pb-2.5 px-4 font-bold border-b-2 transition-all ${
+            activeTab === "reactions" ? "border-brand-red text-brand-red" : "border-transparent text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          👍 रिएक्शन्स
+        </button>
+        <button
+          onClick={() => setActiveTab("site")}
+          className={`pb-2.5 px-4 font-bold border-b-2 transition-all ${
+            activeTab === "site" ? "border-brand-red text-brand-red" : "border-transparent text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          ⚙️ साइट सेटिंग्स
         </button>
       </div>
 
@@ -1722,6 +1824,205 @@ CREATE POLICY "Enable read/write for all users" ON public.editor_ai_settings
         )}
 
       </div>
+
+
+      {/* TAB 6: WEB STORIES MANAGER */}
+      {activeTab === "webstories" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-display font-extrabold text-base text-brand-dark">📸 वेब स्टोरीज़ प्रबंधन</h2>
+              <p className="text-xs text-gray-500 mt-0.5">मुख्यपृष्ठ पर दिखाई देने वाली विज़ुअल स्टोरीज़ यहाँ से जोड़ें, संपादित करें या हटाएँ।</p>
+            </div>
+            <button
+              onClick={() => { setShowStoryForm(true); setEditingStoryIdx(null); setStoryFormTitle(""); setStoryFormCover(""); setStoryFormSlides([{ image: "", caption: "" }]); }}
+              className="flex items-center gap-1.5 px-4 py-2 bg-brand-red text-white text-xs font-bold rounded-lg shadow-sm hover:bg-[#9e0010] cursor-pointer transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" /> नई स्टोरी जोड़ें
+            </button>
+          </div>
+          {showStoryForm && (
+            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
+              <h3 className="font-bold text-sm">{editingStoryIdx !== null ? "स्टोरी संपादित करें" : "नई वेब स्टोरी"}</h3>
+              <div>
+                <label className="block text-xs font-mono uppercase text-gray-500 mb-1">शीर्षक (Title)</label>
+                <input type="text" value={storyFormTitle} onChange={e => setStoryFormTitle(e.target.value)} placeholder="स्टोरी का शीर्षक..." className="w-full text-xs border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50" />
+              </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-gray-500 mb-1">कवर इमेज URL</label>
+                <input type="text" value={storyFormCover} onChange={e => setStoryFormCover(e.target.value)} placeholder="https://..." className="w-full text-xs border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50 font-mono" />
+                {storyFormCover && <img src={storyFormCover} className="mt-2 h-24 w-auto rounded-lg object-cover border" alt="cover preview" />}
+              </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-gray-500 mb-2">स्लाइड्स</label>
+                <div className="space-y-3">
+                  {storyFormSlides.map((slide, idx) => (
+                    <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono text-gray-400 uppercase">स्लाइड {idx + 1}</span>
+                        {storyFormSlides.length > 1 && (
+                          <button onClick={() => setStoryFormSlides(prev => prev.filter((_, i) => i !== idx))} className="text-red-500 text-[10px] font-bold cursor-pointer hover:text-red-700">✕ हटाएँ</button>
+                        )}
+                      </div>
+                      <input type="text" value={slide.image} onChange={e => setStoryFormSlides(prev => prev.map((s, i) => i === idx ? { ...s, image: e.target.value } : s))} placeholder="इमेज URL..." className="w-full text-xs border border-gray-200 outline-none rounded p-2 bg-white font-mono" />
+                      <input type="text" value={slide.caption} onChange={e => setStoryFormSlides(prev => prev.map((s, i) => i === idx ? { ...s, caption: e.target.value } : s))} placeholder="कैप्शन..." className="w-full text-xs border border-gray-200 outline-none rounded p-2 bg-white" />
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setStoryFormSlides(prev => [...prev, { image: "", caption: "" }])} className="mt-2 text-xs text-brand-red font-bold cursor-pointer hover:underline">+ स्लाइड जोड़ें</button>
+              </div>
+              <div className="flex gap-2 pt-2 border-t">
+                <button onClick={() => setShowStoryForm(false)} className="flex-1 py-2 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 cursor-pointer">रद्द करें</button>
+                <button onClick={handleStorySubmit} className="flex-1 py-2 text-xs bg-brand-red text-white rounded-lg font-bold shadow-sm hover:bg-[#9e0010] cursor-pointer">
+                  {editingStoryIdx !== null ? "अपडेट करें" : "स्टोरी सहेजें"}
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {webStoriesAdmin.map((story, idx) => (
+              <div key={story.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+                <div className="relative h-36 bg-gray-100">
+                  <img src={story.coverImage} alt={story.title} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <span className="absolute bottom-2 left-3 right-3 text-white text-xs font-bold line-clamp-2">{story.title}</span>
+                </div>
+                <div className="p-3 flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-gray-400">{story.slides.length} स्लाइड्स</span>
+                  <div className="flex gap-3">
+                    <button onClick={() => { setEditingStoryIdx(idx); setStoryFormTitle(story.title); setStoryFormCover(story.coverImage); setStoryFormSlides([...story.slides]); setShowStoryForm(true); }} className="text-xs text-blue-600 font-bold cursor-pointer hover:underline flex items-center gap-0.5"><Edit3 className="w-3 h-3" /> संपादित</button>
+                    <button onClick={() => { if (window.confirm("इस स्टोरी को हटाएँ?")) saveWebStories(webStoriesAdmin.filter((_, i) => i !== idx)); }} className="text-xs text-red-500 font-bold cursor-pointer hover:underline flex items-center gap-0.5"><Trash2 className="w-3 h-3" /> हटाएँ</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {webStoriesAdmin.length === 0 && <div className="col-span-full text-center py-12 text-gray-400 text-sm">कोई वेब स्टोरी नहीं है।</div>}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: NEWSLETTER SUBSCRIBERS */}
+      {activeTab === "newsletter" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-display font-extrabold text-base text-brand-dark">📧 न्यूज़लेटर सब्सक्राइबर्स</h2>
+              <p className="text-xs text-gray-500 mt-0.5">वेबसाइट पर न्यूज़लेटर फ़ॉर्म भरने वाले सभी पाठकों की सूची।</p>
+            </div>
+            <button onClick={loadSubscribers} className="text-xs text-brand-red font-bold cursor-pointer hover:underline">🔄 रिफ्रेश</button>
+          </div>
+          {subsLoading ? (
+            <div className="text-center py-10 text-gray-400 text-sm">लोड हो रहा है...</div>
+          ) : subscribers.length === 0 ? (
+            <div className="text-center py-12 bg-white border border-gray-200 rounded-xl">
+              <p className="text-gray-400 text-sm">अभी कोई सब्सक्राइबर नहीं है।</p>
+              <p className="text-xs text-gray-400 mt-1">Supabase कनेक्ट करें या पाठकों का इंतज़ार करें।</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+              <div className="px-5 py-3 bg-gray-50 border-b flex items-center justify-between">
+                <span className="text-xs font-mono text-gray-500 uppercase font-bold">कुल: {subscribers.length} सब्सक्राइबर्स</span>
+                <button
+                  onClick={() => { const csv = "Email,Date\n" + subscribers.map(s => `${s.email},${s.created_at || ""}`).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "subscribers.csv"; a.click(); }}
+                  className="text-xs text-brand-red font-bold cursor-pointer hover:underline"
+                >⬇ CSV डाउनलोड</button>
+              </div>
+              <div className="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                {subscribers.map((sub, idx) => (
+                  <div key={idx} className="px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-full bg-brand-red/10 text-brand-red flex items-center justify-center text-[10px] font-black">{sub.email[0].toUpperCase()}</div>
+                      <span className="text-sm font-medium text-gray-800">{sub.email}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-gray-400">{sub.created_at ? new Date(sub.created_at).toLocaleDateString("hi-IN") : "—"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 8: REACTIONS VIEWER */}
+      {activeTab === "reactions" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-display font-extrabold text-base text-brand-dark">👍 लेख रिएक्शन्स</h2>
+              <p className="text-xs text-gray-500 mt-0.5">पाठकों द्वारा दी गई प्रतिक्रियाएँ — प्रत्येक समाचार लेख पर।</p>
+            </div>
+            <button onClick={loadReactions} className="text-xs text-brand-red font-bold cursor-pointer hover:underline">🔄 रिफ्रेश</button>
+          </div>
+          {reactionsLoading ? (
+            <div className="text-center py-10 text-gray-400 text-sm">लोड हो रहा है...</div>
+          ) : reactionStats.length === 0 ? (
+            <div className="text-center py-12 bg-white border border-gray-200 rounded-xl">
+              <p className="text-2xl mb-2">😶</p>
+              <p className="text-gray-400 text-sm">अभी कोई रिएक्शन नहीं है।</p>
+              <p className="text-xs text-gray-400 mt-1">Supabase कनेक्ट होने पर रिएक्शन डेटा यहाँ दिखेगा।</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+              <div className="px-5 py-3 bg-gray-50 border-b">
+                <span className="text-xs font-mono text-gray-500 uppercase font-bold">रिएक्शन वाले {reactionStats.length} लेख</span>
+              </div>
+              <div className="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                {reactionStats.sort((a, b) => (b.like + b.love + b.wow + b.sad) - (a.like + a.love + a.wow + a.sad)).map((stat, idx) => (
+                  <div key={idx} className="px-5 py-3 flex items-center justify-between hover:bg-gray-50 gap-4">
+                    <span className="text-xs font-medium text-gray-800 line-clamp-1 flex-1">{stat.title}</span>
+                    <div className="flex items-center gap-3 text-sm shrink-0">
+                      <span title="पसंद">👍 {stat.like}</span>
+                      <span title="प्यार">❤️ {stat.love}</span>
+                      <span title="वाह">😮 {stat.wow}</span>
+                      <span title="दुःख">😢 {stat.sad}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 9: SITE SETTINGS */}
+      {activeTab === "site" && (
+        <div className="space-y-6 max-w-2xl">
+          <div>
+            <h2 className="font-display font-extrabold text-base text-brand-dark">⚙️ साइट सेटिंग्स</h2>
+            <p className="text-xs text-gray-500 mt-0.5">पोर्टल का नाम, टैगलाइन और ब्रेकिंग न्यूज़ टिकर के डिफ़ॉल्ट टेक्स्ट नियंत्रित करें।</p>
+          </div>
+          <form
+            onSubmit={e => { e.preventDefault(); localStorage.setItem("sp_site_title", siteTitle); localStorage.setItem("sp_site_tagline", siteTagline); localStorage.setItem("sp_site_marquee", siteMarquee); setSiteSettingsSaved(true); setTimeout(() => setSiteSettingsSaved(false), 2500); }}
+            className="bg-white border border-gray-200 rounded-xl p-6 shadow-xs space-y-5"
+          >
+            <div>
+              <label className="block text-xs font-mono uppercase text-gray-500 mb-1.5">साइट का नाम (Site Title)</label>
+              <input type="text" value={siteTitle} onChange={e => setSiteTitle(e.target.value)} className="w-full text-sm border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50 transition-all" />
+              <p className="text-[10px] text-gray-400 mt-1">हेडर में लोगो के बगल में दिखेगा।</p>
+            </div>
+            <div>
+              <label className="block text-xs font-mono uppercase text-gray-500 mb-1.5">टैगलाइन (Tagline)</label>
+              <input type="text" value={siteTagline} onChange={e => setSiteTagline(e.target.value)} className="w-full text-sm border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50 transition-all" />
+              <p className="text-[10px] text-gray-400 mt-1">लोगो के नीचे छोटे अक्षरों में दिखेगा।</p>
+            </div>
+            <div>
+              <label className="block text-xs font-mono uppercase text-gray-500 mb-1.5">ब्रेकिंग न्यूज़ टिकर — डिफ़ॉल्ट टेक्स्ट</label>
+              <textarea rows={2} value={siteMarquee} onChange={e => setSiteMarquee(e.target.value)} className="w-full text-xs border border-gray-200 outline-none focus:border-brand-red rounded-lg p-2.5 bg-gray-50 transition-all resize-none" />
+              <p className="text-[10px] text-gray-400 mt-1">जब कोई ब्रेकिंग न्यूज़ न हो, तब यह टेक्स्ट मार्की में चलेगा।</p>
+            </div>
+            <div className="pt-4 border-t flex items-center justify-between">
+              {siteSettingsSaved && <span className="text-green-600 text-xs font-bold flex items-center gap-1"><Check className="w-3.5 h-3.5" /> सेटिंग्स सहेजी गई!</span>}
+              <button type="submit" className="ml-auto px-6 py-2 bg-brand-red text-white text-xs font-bold rounded-lg shadow-sm hover:bg-[#9e0010] cursor-pointer transition-all flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5" /> सेटिंग्स सहेजें
+              </button>
+            </div>
+          </form>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800 leading-relaxed">
+            <p className="font-bold mb-1">💡 जिला सूची</p>
+            <p>साइडबार में दिखने वाले जिले <code className="bg-amber-100 px-1 rounded font-mono">CHHATTISGARH_DISTRICTS</code> से आते हैं — ये सभी 32 छत्तीसगढ़ जिले पहले से लोड हैं।</p>
+          </div>
+        </div>
+      )}
 
       {/* MODAL WINDOW FOR CREATE / EDIT FORM */}
       {showFormModal && (
