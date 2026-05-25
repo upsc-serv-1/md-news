@@ -1470,19 +1470,19 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* BELOW HERO: Today's Top Headlines Strip */}
-                    {filteredArticles.length > 0 && (
+                    {/* BELOW HERO: Most Read / Popular Articles */}
+                    {trendingArticles.length > 0 && (
                       <div className="flex flex-col gap-3 animate-fade-in">
-                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-2">
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-2.5">
                           <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 bg-brand-red text-white text-[9px] font-mono font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md shadow-xs">
+                            <span className="inline-flex items-center gap-1.5 bg-brand-red text-white text-[9px] font-mono font-black uppercase tracking-widest px-2.5 py-1 rounded-md shadow-xs">
                               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                              आज की सुर्खियाँ
+                              सबसे ज़्यादा पढ़ी गई
                             </span>
-                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono tracking-wider">Today's Headlines</span>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono tracking-wider">Most Read Today</span>
                           </div>
                           <button
-                            onClick={() => { setSelectedCategory("all"); setCustomFilter(null); }}
+                            onClick={() => { setSelectedCategory("trending"); setCustomFilter(null); }}
                             className="text-[10px] font-bold text-brand-red dark:text-red-400 hover:underline font-body cursor-pointer select-none"
                           >
                             सभी देखें →
@@ -1490,35 +1490,39 @@ export default function App() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                          {filteredArticles.slice(0, 4).map((art, idx) => (
+                          {trendingArticles.slice(0, 4).map((art, idx) => (
                             <a
                               key={art.id}
                               onClick={() => setSelectedArticleId(art.id)}
-                              className="group flex gap-2.5 cursor-pointer bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-xl p-2.5 hover:shadow-sm hover:border-pink-100 dark:hover:border-zinc-700 transition-all duration-200 hover:-translate-y-0.5"
+                              className="group flex flex-col cursor-pointer bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-xl overflow-hidden hover:shadow-md hover:border-pink-100 dark:hover:border-zinc-700 transition-all duration-200 hover:-translate-y-0.5"
                             >
-                              {/* Number badge */}
-                              <div className="shrink-0 w-7 h-7 rounded-lg bg-red-50 dark:bg-red-500/10 flex items-center justify-center border border-red-100 dark:border-red-500/20">
-                                <span className="text-xs font-black text-brand-red dark:text-red-400 font-mono">{idx + 1}</span>
-                              </div>
-                              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                                <span className="text-[9px] font-mono font-black text-brand-red dark:text-red-400 uppercase tracking-wider">
-                                  {categories.find(c => c.id === art.category)?.name_hi || "ताज़ा"}
-                                </span>
-                                <h3 className="text-[11px] font-bold text-slate-800 dark:text-zinc-100 group-hover:text-brand-red transition-colors line-clamp-2 leading-snug font-body">
-                                  {art.title}
-                                </h3>
-                                <span className="text-[9px] text-slate-400 dark:text-zinc-500 font-mono flex items-center gap-0.5 mt-0.5">
-                                  <Eye className="w-2.5 h-2.5" /> {art.views || 0}
-                                </span>
-                              </div>
-                              <div className="shrink-0 w-16 h-14 rounded-lg overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-100 dark:border-zinc-800">
+                              {/* Large thumbnail */}
+                              <div className="relative w-full aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-zinc-800">
                                 <img
-                                  src={optimizeCloudinaryUrl(art.image_url, 120)}
+                                  src={optimizeCloudinaryUrl(art.image_url, 400)}
                                   alt={art.title}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                   referrerPolicy="no-referrer"
                                   onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_NEWS_IMAGE; }}
                                 />
+                                {/* Rank badge overlay */}
+                                <div className="absolute top-2 left-2 w-6 h-6 rounded-md bg-brand-red flex items-center justify-center shadow-md">
+                                  <span className="text-[10px] font-black text-white font-mono">{idx + 1}</span>
+                                </div>
+                                {/* Category chip */}
+                                <span className="absolute bottom-2 left-2 text-[9px] font-mono font-black text-white bg-black/60 backdrop-blur-xs px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                  {categories.find(c => c.id === art.category)?.name_hi || "ताज़ा"}
+                                </span>
+                              </div>
+                              {/* Text content */}
+                              <div className="p-2.5 flex flex-col gap-1.5">
+                                <h3 className="text-xs font-bold text-slate-800 dark:text-zinc-100 group-hover:text-brand-red transition-colors line-clamp-2 leading-snug font-body">
+                                  {art.title}
+                                </h3>
+                                <div className="flex items-center gap-2 text-[9px] text-slate-400 dark:text-zinc-500 font-mono">
+                                  <span className="flex items-center gap-0.5"><Eye className="w-2.5 h-2.5" /> {(art.views || 0).toLocaleString()}</span>
+                                  <span className="flex items-center gap-0.5"><Calendar className="w-2.5 h-2.5" /> {art.published_at}</span>
+                                </div>
                               </div>
                             </a>
                           ))}
