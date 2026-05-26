@@ -64,6 +64,9 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
   const [deletingArticleId, setDeletingArticleId] = useState<string | null>(null);
+  const [selectedArticleIds, setSelectedArticleIds] = useState<string[]>([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isEditorFullscreen, setIsEditorFullscreen] = useState(false);
 
   // Cloudinary config state
@@ -298,8 +301,13 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
     setLoading(true);
     const arts = await newsService.getArticles(undefined, true);
     setArticles(arts);
+    setSelectedArticleIds([]);
     setLoading(false);
   };
+
+  useEffect(() => {
+    setSelectedArticleIds([]);
+  }, [activeTab, searchTerm, selectedCategory]);
 
   useEffect(() => {
     // Check local session and restore Supabase Auth session
@@ -717,6 +725,26 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
     if (onDataChanged) onDataChanged();
   };
 
+  // Handle Bulk Delete
+  const handleBulkDeleteArticles = async () => {
+    if (selectedArticleIds.length === 0) return;
+    setIsBulkDeleting(true);
+    try {
+      await Promise.all(selectedArticleIds.map(id => newsService.deleteArticle(id)));
+      setSelectedArticleIds([]);
+      setShowBulkDeleteConfirm(false);
+      await loadArticlesList();
+      if (onDataChanged) onDataChanged();
+    } catch (err: any) {
+      console.error("Bulk delete failed:", err);
+      // reload to ensure correct state representation
+      await loadArticlesList();
+      if (onDataChanged) onDataChanged();
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   // Instant checkbox setting toggles
   const toggleArticleSetting = async (id: string, settingKey: "is_breaking" | "is_featured" | "is_trending", currentValue: boolean) => {
     const newValue = !currentValue;
@@ -1097,6 +1125,32 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
               </button>
             </div>
 
+            {/* Bulk actions bar */}
+            {selectedArticleIds.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs animate-fade-in">
+                <div className="flex items-center gap-2 text-brand-red">
+                  <AlertTriangle className="w-4 h-4 text-brand-red" />
+                  <span className="text-xs font-bold font-body">
+                    {selectedArticleIds.length} समाचार चयनित हैं
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    onClick={() => setSelectedArticleIds([])}
+                    className="w-full sm:w-auto text-gray-500 hover:text-gray-800 text-xs font-label-bold px-3 py-1.5 rounded-lg border border-gray-250 hover:bg-gray-100 transition-colors cursor-pointer bg-white"
+                  >
+                    चयन रद्द करें
+                  </button>
+                  <button
+                    onClick={() => setShowBulkDeleteConfirm(true)}
+                    className="w-full sm:w-auto bg-brand-red hover:bg-[#9e0010] text-white px-3 py-1.5 rounded-lg font-label-bold text-xs inline-flex items-center justify-center gap-1 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> चयनित हटाएं (Bulk Delete)
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Table */}
             {loading ? (
               <div className="min-h-[300px] flex items-center justify-center bg-white border rounded-lg">
@@ -1116,6 +1170,28 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
                   <table className="w-full text-left border-collapse font-body text-xs">
                     <thead>
                       <tr className="bg-gray-50 text-gray-500 uppercase font-mono text-[10px] tracking-wide border-b border-gray-200">
+                        <th className="py-3 px-4 w-10 text-center">
+                          <input
+                            type="checkbox"
+                            checked={filteredArticles.length > 0 && filteredArticles.every(art => selectedArticleIds.includes(art.id))}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedArticleIds(prev => {
+                                  const newSelection = [...prev];
+                                  filteredArticles.forEach(art => {
+                                    if (!newSelection.includes(art.id)) {
+                                      newSelection.push(art.id);
+                                    }
+                                  });
+                                  return newSelection;
+                                });
+                              } else {
+                                setSelectedArticleIds(prev => prev.filter(id => !filteredArticles.some(art => art.id === id)));
+                              }
+                            }}
+                            className="rounded border-gray-300 text-brand-red focus:ring-brand-red w-4 h-4 cursor-pointer"
+                          />
+                        </th>
                         <th className="py-3 px-4">प्रकाशन शीर्षक & लेखक</th>
                         <th className="py-3 px-4">श्रेणी</th>
                         <th className="py-3 px-4 text-center">ब्रेकिंग</th>
@@ -1127,7 +1203,21 @@ export default function AdminPanel({ onBack, onDataChanged, userEmail = "drmahes
                     </thead>
                     <tbody className="divide-y divide-gray-150">
                       {filteredArticles.map((art) => (
-                        <tr key={art.id} className="hover:bg-gray-50/50 transition-colors">
+                        <tr key={art.id} className={`transition-colors ${selectedArticleIds.includes(art.id) ? 'bg-brand-red/5 hover:bg-brand-red/10' : 'hover:bg-gray-50/50'}`}>
+                          <td className="py-3.5 px-4 w-10 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedArticleIds.includes(art.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedArticleIds(prev => [...prev, art.id]);
+                                } else {
+                                  setSelectedArticleIds(prev => prev.filter(id => id !== art.id));
+                                }
+                              }}
+                              className="rounded border-gray-300 text-brand-red focus:ring-brand-red w-4 h-4 cursor-pointer"
+                            />
+                          </td>
                           <td className="py-3.5 px-4 max-w-xs sm:max-w-sm">
                             <div className="flex flex-col">
                               <span className="font-bold text-gray-900 block line-clamp-1">{art.title}</span>
@@ -2822,6 +2912,50 @@ CREATE POLICY "Enable read/write for all users" ON public.editor_ai_settings
                 className="flex-1 py-2 text-xs bg-brand-red hover:bg-[#9e0010] text-white rounded-lg font-label-bold shadow-sm transition-all cursor-pointer"
               >
                 हटाएं (Delete)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK DELETE CONFIRMATION MODAL */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 z-[130] bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-sm rounded-xl border border-gray-250 p-6 shadow-2xl relative overflow-hidden text-center animate-fade-in">
+            <div className="h-2 bg-brand-red absolute top-0 left-0 right-0"></div>
+            <div className="mb-4 text-brand-red flex justify-center">
+              {isBulkDeleting ? (
+                <Loader2 className="w-12 h-12 text-brand-red animate-spin" />
+              ) : (
+                <AlertTriangle className="w-12 h-12 text-brand-red animate-bounce" />
+              )}
+            </div>
+            <h3 className="font-display font-extrabold text-sm text-brand-dark mb-2">
+              समाचार थोक में हटाने की पुष्टि
+            </h3>
+            <p className="text-xs text-gray-500 font-body leading-relaxed mb-6">
+              क्या आप वाकई <strong>{selectedArticleIds.length}</strong> चयनित समाचारों को हटाना चाहते हैं? यह कार्रवाई स्थायी है और इसे वापस नहीं लिया जा सकता।
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                disabled={isBulkDeleting}
+                className="flex-1 py-2 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-100 font-label-bold transition-all cursor-pointer disabled:opacity-50"
+              >
+                रद्द करें
+              </button>
+              <button
+                onClick={handleBulkDeleteArticles}
+                disabled={isBulkDeleting}
+                className="flex-1 py-2 text-xs bg-brand-red hover:bg-[#9e0010] text-white rounded-lg font-label-bold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
+              >
+                {isBulkDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> हटाया जा रहा है...
+                  </>
+                ) : (
+                  "हाँ, हटाए"
+                )}
               </button>
             </div>
           </div>
