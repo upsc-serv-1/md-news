@@ -544,6 +544,15 @@ export default function App() {
   
   // Science & health articles
   const scienceArticles = articles.filter((a) => a.category === "science-health").slice(0, 2);
+  
+  // Bureaucrats category articles
+  const bureaucratsArticles = articles.filter((a) => a.category === "bureaucrats").slice(0, 4);
+
+  // Crime category articles
+  const crimeArticles = articles.filter((a) => a.category === "crime").slice(0, 4);
+
+  // Education and job category articles
+  const educationArticles = articles.filter((a) => a.category === "education" || a.category === "job").slice(0, 4);
 
   // Trending articles
   const trendingArticles = [...articles].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
@@ -1653,10 +1662,148 @@ export default function App() {
                                    }} />
                           </div>
                           <div className="p-3.5 flex-grow flex flex-col justify-between font-body">
-                            <h3 className="text-xs font-bold text-slate-800 dark:text-zinc-100 group-hover:text-brand-red line-clamp-2 leading-snug">
+                            <h3 className="text-xs font-bold text-slate-880 dark:text-zinc-100 group-hover:text-brand-red line-clamp-2 leading-snug">
                               {art.title}
                             </h3>
                             <span className="text-[9px] font-mono text-gray-50 dark:text-zinc-400 mt-3 block">
+                              {art.published_at}
+                            </span>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* DYNAMIC BUREAUCRATS SECTION */}
+                {selectedCategory === "all" && bureaucratsArticles.length > 0 && (
+                  <section className="scroll-mt-24">
+                    <div className="flex items-center justify-between border-b border-brand-red mb-6">
+                      <h2 className="font-display font-extrabold text-[#111827] dark:text-white pb-2 flex items-center gap-2">
+                        <Award className="w-5 h-5 text-brand-red" /> ब्यूरोक्रेट्स (Bureaucrats)
+                      </h2>
+                      <button
+                        onClick={() => setSelectedCategory("bureaucrats")}
+                        className="text-[10px] font-mono font-bold text-brand-red dark:text-red-500 hover:underline"
+                      >
+                        सभी देखें &gt;
+                      </button>
+                    </div>
+                    <div className="flex overflow-x-auto no-scrollbar scroll-smooth gap-5 pb-4 px-1 w-full">
+                      {bureaucratsArticles.map((art) => (
+                        <a
+                          key={art.id}
+                          onClick={() => setSelectedArticleId(art.id)}
+                          className="group flex flex-col cursor-pointer bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 shrink-0 w-[285px] sm:w-[305px]"
+                        >
+                          <div className="aspect-video w-full overflow-hidden bg-gray-100">
+                            <img
+                              src={art.image_url}
+                              alt={art.title}
+                              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+                              referrerPolicy="no-referrer"
+                             onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
+                          </div>
+                          <div className="p-3.5 flex-grow flex flex-col justify-between font-body">
+                            <h3 className="text-xs font-bold text-slate-800 dark:text-zinc-100 group-hover:text-brand-red line-clamp-2 leading-snug">
+                              {art.title}
+                            </h3>
+                            <span className="text-[9px] font-mono text-gray-500 dark:text-zinc-400 mt-3 block">
+                              {art.published_at}
+                            </span>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* DYNAMIC CRIME SECTION */}
+                {selectedCategory === "all" && crimeArticles.length > 0 && (
+                  <section className="scroll-mt-24">
+                    <div className="flex items-center justify-between border-b border-brand-red mb-6">
+                      <h2 className="font-display font-extrabold text-[#111827] dark:text-white pb-2 flex items-center gap-2">
+                        <Flame className="w-5 h-5 text-brand-red" /> क्राइम (Crime Updates)
+                      </h2>
+                      <button
+                        onClick={() => setSelectedCategory("crime")}
+                        className="text-[10px] font-mono font-bold text-brand-red dark:text-red-500 hover:underline"
+                      >
+                        सभी देखें &gt;
+                      </button>
+                    </div>
+                    <div className="flex overflow-x-auto no-scrollbar scroll-smooth gap-5 pb-4 px-1 w-full">
+                      {crimeArticles.map((art) => (
+                        <a
+                          key={art.id}
+                          onClick={() => setSelectedArticleId(art.id)}
+                          className="group flex flex-col cursor-pointer bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 shrink-0 w-[285px] sm:w-[305px]"
+                        >
+                          <div className="aspect-video w-full overflow-hidden bg-gray-100">
+                            <img
+                              src={art.image_url}
+                              alt={art.title}
+                              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+                              referrerPolicy="no-referrer"
+                             onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
+                          </div>
+                          <div className="p-3.5 flex-grow flex flex-col justify-between font-body">
+                            <h3 className="text-xs font-bold text-slate-800 dark:text-zinc-100 group-hover:text-brand-red line-clamp-2 leading-snug">
+                              {art.title}
+                            </h3>
+                            <span className="text-[9px] font-mono text-gray-500 dark:text-zinc-400 mt-3 block">
+                              {art.published_at}
+                            </span>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* DYNAMIC EDUCATION & JOBS SECTION */}
+                {selectedCategory === "all" && educationArticles.length > 0 && (
+                  <section className="scroll-mt-24">
+                    <div className="flex items-center justify-between border-b border-brand-red mb-6">
+                      <h2 className="font-display font-extrabold text-[#111827] dark:text-white pb-2 flex items-center gap-2">
+                        <BookOpen className="w-5 h-5 text-brand-red" /> शिक्षा और नौकरी (Education & Jobs)
+                      </h2>
+                      <button
+                        onClick={() => setSelectedCategory("education")}
+                        className="text-[10px] font-mono font-bold text-brand-red dark:text-red-500 hover:underline"
+                      >
+                        सभी देखें &gt;
+                      </button>
+                    </div>
+                    <div className="flex overflow-x-auto no-scrollbar scroll-smooth gap-5 pb-4 px-1 w-full">
+                      {educationArticles.map((art) => (
+                        <a
+                          key={art.id}
+                          onClick={() => setSelectedArticleId(art.id)}
+                          className="group flex flex-col cursor-pointer bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 shrink-0 w-[285px] sm:w-[305px]"
+                        >
+                          <div className="aspect-video w-full overflow-hidden bg-gray-100">
+                            <img
+                              src={art.image_url}
+                              alt={art.title}
+                              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+                              referrerPolicy="no-referrer"
+                             onError={(e) => {
+                                     e.currentTarget.onerror = null;
+                                     e.currentTarget.src = DEFAULT_NEWS_IMAGE;
+                                   }} />
+                          </div>
+                          <div className="p-3.5 flex-grow flex flex-col justify-between font-body">
+                            <h3 className="text-xs font-bold text-slate-800 dark:text-zinc-100 group-hover:text-brand-red line-clamp-2 leading-snug">
+                              {art.title}
+                            </h3>
+                            <span className="text-[9px] font-mono text-gray-500 dark:text-zinc-400 mt-3 block">
                               {art.published_at}
                             </span>
                           </div>
