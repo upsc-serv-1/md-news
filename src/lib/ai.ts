@@ -36,6 +36,10 @@ export const DEFAULT_CATEGORY_PRESETS: Record<string, string> = {
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: "politics", name_en: "Politics", name_hi: "राजनीति" },
   { id: "local", name_en: "Local", name_hi: "स्थानीय" },
+  { id: "bureaucrats", name_en: "Bureaucrats", name_hi: "ब्यूरोक्रेट्स" },
+  { id: "crime", name_en: "Crime", name_hi: "क्राइम" },
+  { id: "job", name_en: "Jobs", name_hi: "नौकरी" },
+  { id: "education", name_en: "Education", name_hi: "शिक्षा" },
   { id: "world", name_en: "World", name_hi: "दुनिया" },
   { id: "entertainment", name_en: "Entertainment", name_hi: "मनोरंजन" },
   { id: "video", name_en: "Video", name_hi: "वीडियो" },

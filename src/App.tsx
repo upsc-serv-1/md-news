@@ -988,7 +988,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* UNIFORM HORIZONTAL CATEGORIES */}
-        <div className="w-full bg-white dark:bg-zinc-900 border-b border-slate-100 dark:border-zinc-800/80 py-2.5 relative overflow-hidden select-none z-30 shadow-3xs">
+        <div className="w-full lg:hidden bg-white dark:bg-zinc-900 border-b border-slate-100 dark:border-zinc-800/80 py-2.5 relative overflow-hidden select-none z-30 shadow-3xs">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-zinc-900 to-transparent pointer-events-none z-10" />
             <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-zinc-900 to-transparent pointer-events-none z-10" />
@@ -1077,104 +1077,72 @@ export default function App() {
               
               {/* LEFT SIDEBAR NAVIGATION (Desktop Sticky Sidebar) */}
               <aside className="hidden lg:block lg:col-span-3 sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl p-4 shadow-sm select-none font-body custom-scrollbar">
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1.5">
                   
                   {/* Title of Sidebar */}
-                  <span className="text-[10px] font-mono tracking-widest text-slate-400 dark:text-zinc-500 uppercase font-black px-2.5 pb-2 border-b border-slate-100 dark:border-zinc-800/80 mb-2">नेविगेशन (Navigation)</span>
+                  <span className="text-[10px] font-mono tracking-widest text-slate-400 dark:text-zinc-500 uppercase font-black px-2.5 pb-2 border-b border-slate-100 dark:border-zinc-800/80 mb-2.5">श्रेणियां (Categories)</span>
 
-                  {/* 1. मोर छत्तीसगढ़ */}
+                  {/* 1. मुख्य समाचार */}
                   <button
                     onClick={() => {
                       setSelectedCategory("all");
                       setCustomFilter(null);
-                      setSelectedDistrict(null);
                       setSelectedArticleId(null);
                     }}
                     className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                      selectedCategory === "all" && !customFilter && !selectedDistrict
-                        ? "bg-pink-50 text-pink-600 dark:bg-pink-950/20 font-extrabold border-l-4 border-pink-600 pl-2"
-                        : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 hover:text-pink-600 dark:hover:text-pink-400"
+                      selectedCategory === "all" && !customFilter
+                        ? "bg-brand-red text-white font-extrabold shadow-sm scale-102 pl-4"
+                        : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 hover:text-brand-red dark:hover:text-red-400"
                     }`}
                   >
-                    <MapPin className="w-4 h-4 text-pink-500 animate-pulse" />
-                    <span>मोर छत्तीसगढ़</span>
+                    <Layers className={`w-4 h-4 shrink-0 ${selectedCategory === "all" && !customFilter ? "text-white" : "text-brand-red"}`} />
+                    <span>मुख्य समाचार</span>
                   </button>
 
-                  {/* 2. छत्तीसगढ़ सरकार */}
-                  <button
-                    onClick={() => {
-                      setCustomFilter("government");
-                      setSelectedCategory("all");
-                      setSelectedDistrict(null);
-                      setSelectedArticleId(null);
-                    }}
-                    className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                      customFilter === "government"
-                        ? "bg-pink-50 text-pink-600 dark:bg-pink-950/20 font-extrabold border-l-4 border-pink-600 pl-2"
-                        : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 hover:text-pink-600 dark:hover:text-pink-400"
-                    }`}
-                  >
-                    <Award className="w-4 h-4 text-pink-500" />
-                    <span>छत्तीसगढ़ सरकार</span>
-                  </button>
+                  {/* Dynamic categories list */}
+                  {categories.map((cat) => {
+                    let IconComponent = Compass;
+                    if (cat.id === "politics") IconComponent = Award;
+                    else if (cat.id === "local") IconComponent = MapPin;
+                    else if (cat.id === "bureaucrats") IconComponent = Award;
+                    else if (cat.id === "crime") IconComponent = Flame;
+                    else if (cat.id === "job") IconComponent = Compass;
+                    else if (cat.id === "education") IconComponent = BookOpen;
+                    else if (cat.id === "world") IconComponent = Globe2;
+                    else if (cat.id === "entertainment") IconComponent = Film;
+                    else if (cat.id === "video") IconComponent = Video;
+                    else if (cat.id === "science-health") IconComponent = Heart;
+                    else if (cat.id === "business") IconComponent = Layers;
+                    else if (cat.id === "sports") IconComponent = Award;
+                    else if (cat.id === "technology") IconComponent = Atom;
+                    else if (cat.id === "weather") IconComponent = CloudSun;
 
+                    const isSelected = selectedCategory === cat.id && !customFilter;
 
-
-                  {/* 4. आपका जिला (Jaipur, Jodhpur, etc.) */}
-                  <div className="flex flex-col">
-                    <button
-                      onClick={() => setIsDistrictCollapsed(!isDistrictCollapsed)}
-                      className="flex items-center justify-between w-full px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 rounded-xl transition-all cursor-pointer select-none"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Compass className="w-4 h-4 text-pink-500" />
-                        <span>आपका जिला</span>
-                      </div>
-                      {isDistrictCollapsed ? (
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-455 dark:text-zinc-555 transition-transform duration-200" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5 text-slate-455 dark:text-zinc-555 transition-transform duration-200" />
-                      )}
-                    </button>
-                    {/* Collapsible list of districts */}
-                    {!isDistrictCollapsed && (
-                      <div className="ml-7 mt-0.5 mb-2 flex flex-col gap-1 border-l border-slate-100 dark:border-zinc-800 pl-3">
-                        {["रायपुर", "बिलासपुर", "दुर्ग", "कोरबा", "जगदलपुर"].map((dist) => (
-                          <button
-                            key={dist}
-                            onClick={() => {
-                              setSelectedDistrict(dist);
-                              setSelectedCategory("all");
-                              setCustomFilter(null);
-                              setSelectedArticleId(null);
-                            }}
-                            className={`text-left text-xs py-1.5 transition-all hover:text-pink-650 dark:hover:text-pink-450 cursor-pointer ${
-                              selectedDistrict === dist
-                                ? "text-pink-600 dark:text-pink-400 font-extrabold"
-                                : "text-slate-500 dark:text-zinc-400 hover:translate-x-0.5 duration-200"
-                            }`}
-                          >
-                            ▸ {dist}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 5. Select District Pink Button */}
-                  <div className="px-2 py-1.5 border-t border-b border-slate-100 dark:border-zinc-800/80 my-1.5">
-                    <button
-                      onClick={() => setIsDistrictModalOpen(true)}
-                      className="bg-pink-600 hover:bg-pink-700 text-white w-full text-center py-2 text-xs font-extrabold rounded-xl shadow-xs transition-all active:scale-97 select-none cursor-pointer"
-                    >
-                      अपना जिला चुनें
-                    </button>
-                  </div>
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => {
+                          setSelectedCategory(cat.id);
+                          setCustomFilter(null);
+                          setSelectedArticleId(null);
+                        }}
+                        className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer mt-0.5 ${
+                          isSelected
+                            ? "bg-brand-red text-white font-extrabold shadow-sm scale-102 pl-4"
+                            : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 hover:text-brand-red dark:hover:text-red-400"
+                        }`}
+                      >
+                        <IconComponent className={`w-4 h-4 shrink-0 ${isSelected ? "text-white" : "text-brand-red"}`} />
+                        <span>{cat.name_hi}</span>
+                      </button>
+                    );
+                  })}
 
                   {/* WEATHER WIDGET */}
-                  <div className="border-t border-slate-100 dark:border-zinc-800/80 my-4 pt-4 px-1.5 font-body">
+                  <div className="border-t border-slate-100 dark:border-zinc-800/85 mt-4 pt-4 px-1 font-body">
                     <span className="text-[10px] font-mono tracking-widest text-slate-400 dark:text-zinc-500 uppercase font-black block mb-2.5">
-                      छत्तीसगढ़ मौसम (Weather) {weather.loading ? "• लोड हो रहा है..." : "• लाइव"}
+                      छत्तीसगढ़ मौसम (Weather) {weather.loading ? "• लोड..." : "• लाइव"}
                     </span>
                     <div className="bg-gradient-to-br from-pink-50/50 to-amber-50/20 dark:from-zinc-900/40 dark:to-zinc-850/20 rounded-xl p-3 border border-pink-100/30 dark:border-zinc-800 flex flex-col gap-2">
                       {weather.raipur && (
@@ -1186,7 +1154,7 @@ export default function App() {
                               <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">{weather.raipur.description}</span>
                             </div>
                           </div>
-                          <span className="text-xs font-black text-pink-600 dark:text-pink-400">{weather.raipur.temp}°C</span>
+                          <span className="text-xs font-black text-brand-red dark:text-red-400">{weather.raipur.temp}°C</span>
                         </div>
                       )}
                       {weather.bilaspur && (
@@ -1198,7 +1166,7 @@ export default function App() {
                               <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">{weather.bilaspur.description}</span>
                             </div>
                           </div>
-                          <span className="text-xs font-black text-pink-600 dark:text-pink-400">{weather.bilaspur.temp}°C</span>
+                          <span className="text-xs font-black text-brand-red dark:text-red-400">{weather.bilaspur.temp}°C</span>
                         </div>
                       )}
                       {weather.bastar && (
@@ -1210,130 +1178,9 @@ export default function App() {
                               <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">{weather.bastar.description}</span>
                             </div>
                           </div>
-                          <span className="text-xs font-black text-pink-600 dark:text-pink-400">{weather.bastar.temp}°C</span>
+                          <span className="text-xs font-black text-brand-red dark:text-red-400">{weather.bastar.temp}°C</span>
                         </div>
                       )}
-                    </div>
-                  </div>
-
-                  {/* 6. क्राइम */}
-                  <button
-                    onClick={() => {
-                      setCustomFilter("crime");
-                      setSelectedCategory("all");
-                      setSelectedDistrict(null);
-                      setSelectedArticleId(null);
-                    }}
-                    className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                      customFilter === "crime"
-                        ? "bg-pink-50 text-pink-600 dark:bg-pink-950/20 font-extrabold border-l-4 border-pink-600 pl-2"
-                        : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 hover:text-pink-600 dark:hover:text-pink-400"
-                    }`}
-                  >
-                    <Flame className="w-4 h-4 text-pink-500" />
-                    <span>क्राइम</span>
-                  </button>
-
-                  {/* 9. नौकरी/शिक्षा */}
-                  <button
-                    onClick={() => {
-                      setCustomFilter("education");
-                      setSelectedCategory("all");
-                      setSelectedDistrict(null);
-                      setSelectedArticleId(null);
-                    }}
-                    className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                      customFilter === "education"
-                        ? "bg-pink-50 text-pink-600 dark:bg-pink-950/20 font-extrabold border-l-4 border-pink-600 pl-2"
-                        : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 hover:text-pink-600 dark:hover:text-pink-400"
-                    }`}
-                  >
-                    <BookOpen className="w-4 h-4 text-pink-500" />
-                    <span>नौकरी/शिक्षा</span>
-                  </button>
-
-                  {/* 10. छत्तीसगढ़ टूरिज्म */}
-                  <button
-                    onClick={() => {
-                      setCustomFilter("tourism");
-                      setSelectedCategory("all");
-                      setSelectedDistrict(null);
-                      setSelectedArticleId(null);
-                    }}
-                    className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                      customFilter === "tourism"
-                        ? "bg-pink-50 text-pink-600 dark:bg-pink-950/20 font-extrabold border-l-4 border-pink-600 pl-2"
-                        : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 hover:text-pink-600 dark:hover:text-pink-400"
-                    }`}
-                  >
-                    <Compass className="w-4 h-4 text-pink-500" />
-                    <span>छत्तीसगढ़ टूरिज्म</span>
-                  </button>
-
-                  {/* WEATHER WIDGET */}
-                  <div className="border-t border-slate-100 dark:border-zinc-800/80 my-4 pt-4 px-1.5 font-body">
-                    <span className="text-[10px] font-mono tracking-widest text-slate-400 dark:text-zinc-500 uppercase font-black block mb-2.5">छत्तीसगढ़ मौसम (Weather)</span>
-                    <div className="bg-gradient-to-br from-pink-50/50 to-amber-50/20 dark:from-zinc-900/40 dark:to-zinc-850/20 rounded-xl p-3 border border-pink-100/30 dark:border-zinc-800 flex flex-col gap-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <CloudRain className="w-5 h-5 text-pink-550 animate-bounce" />
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-slate-850 dark:text-zinc-200">रायपुर (Raipur)</span>
-                            <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">हल्की बारिश (Rainy)</span>
-                          </div>
-                        </div>
-                        <span className="text-xs font-black text-pink-600 dark:text-pink-400">31°C</span>
-                      </div>
-                      <div className="flex items-center justify-between border-t border-slate-100 dark:border-zinc-800/60 pt-2 mt-1">
-                        <div className="flex items-center gap-2">
-                          <CloudSun className="w-5 h-5 text-amber-500" />
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-slate-850 dark:text-zinc-200">बिलासपुर (Bilaspur)</span>
-                            <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">आंशिक बादल (Cloudy)</span>
-                          </div>
-                        </div>
-                        <span className="text-xs font-black text-pink-600 dark:text-pink-400">33°C</span>
-                      </div>
-                      <div className="flex items-center justify-between border-t border-slate-100 dark:border-zinc-800/60 pt-2 mt-1">
-                        <div className="flex items-center gap-2">
-                          <Sun className="w-5 h-5 text-orange-500" style={{ animation: "spin 12s linear infinite" }} />
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-slate-850 dark:text-zinc-200">बस्तर (Bastar)</span>
-                            <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">धूप (Sunny)</span>
-                          </div>
-                        </div>
-                        <span className="text-xs font-black text-pink-600 dark:text-pink-400">29°C</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* TRENDING TAGS PANEL */}
-                  <div className="border-t border-slate-100 dark:border-zinc-800/80 my-4 pt-4 px-1.5 font-body">
-                    <span className="text-[10px] font-mono tracking-widest text-slate-400 dark:text-zinc-500 uppercase font-black block mb-2.5">ट्रेंडिंग विषय (Trending)</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { label: "छत्तीसगढ़_मानसून", query: "मानसून" },
-                        { label: "परीक्षा_भर्ती", query: "भर्ती" },
-                        { label: "चित्रकोट_जलप्रपात", query: "चित्रकोट" },
-                        { label: "भूपेश_बघेल", query: "बघेल" },
-                        { label: "रायपुर_विकास", query: "रायपुर" },
-                        { label: "नौकरी_2026", query: "नौकरी" }
-                      ].map((tag) => (
-                        <button
-                          key={tag.label}
-                          onClick={() => {
-                            setSearchQuery(tag.query);
-                            setIsSearchOpen(true);
-                            setSelectedCategory("all");
-                            setCustomFilter(null);
-                            setSelectedArticleId(null);
-                          }}
-                          className="flex items-center gap-0.5 px-2 py-1 rounded-lg bg-slate-50 hover:bg-pink-50 hover:text-pink-600 dark:bg-zinc-850 dark:hover:bg-zinc-800 dark:hover:text-pink-400 text-[10px] font-bold text-slate-600 dark:text-zinc-350 border border-slate-150 dark:border-zinc-800 transition-all cursor-pointer hover:scale-102"
-                        >
-                          <Hash className="w-2.5 h-2.5 text-pink-500" />
-                          <span>{tag.label}</span>
-                        </button>
-                      ))}
                     </div>
                   </div>
 
