@@ -25,6 +25,9 @@ import {
   Moon,
   CloudSun,
   CloudRain,
+  Cloud,
+  CloudLightning,
+  Snowflake,
   Hash
 } from "lucide-react";
 import ArticleDetail from "./components/ArticleDetail";
@@ -199,6 +202,19 @@ export default function App() {
 
   // Mobile shorts state
   const [activeShortIndex, setActiveShortIndex] = useState(0);
+
+  // Real-time Weather State
+  const [weather, setWeather] = useState<{
+    raipur: { temp: number; description: string; icon: string } | null;
+    bilaspur: { temp: number; description: string; icon: string } | null;
+    bastar: { temp: number; description: string; icon: string } | null;
+    loading: boolean;
+  }>({
+    raipur: { temp: 31, description: "हल्की बारिश", icon: "rain" },
+    bilaspur: { temp: 33, description: "आंशिक बादल", icon: "cloudy" },
+    bastar: { temp: 29, description: "धूप", icon: "sunny" },
+    loading: true,
+  });
 
   // Computed and filtered articles logic based on categories AND city filter
   const getFilteredArticles = () => {
@@ -394,6 +410,66 @@ export default function App() {
     };
   }, []);
 
+  // Real-time Weather Fetching
+  useEffect(() => {
+    const fetchWeather = async () => {
+      const fetchCity = async (lat: number, lon: number) => {
+        try {
+          const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`);
+          if (!res.ok) throw new Error("Failed to fetch");
+          const data = await res.json();
+          const temp = Math.round(data.current.temperature_2m);
+          const code = data.current.weather_code;
+
+          let description = "साफ़ मौसम";
+          let icon = "sunny";
+
+          if (code === 0) {
+            description = "धूप (Sunny)";
+            icon = "sunny";
+          } else if (code >= 1 && code <= 3) {
+            description = "आंशिक बादल (Cloudy)";
+            icon = "cloudy";
+          } else if (code === 45 || code === 48) {
+            description = "कोहरा (Foggy)";
+            icon = "foggy";
+          } else if (code >= 51 && code <= 55) {
+            description = "बूंदाबांदी (Drizzle)";
+            icon = "drizzle";
+          } else if (code >= 61 && code <= 65) {
+            description = "हल्की बारिश (Rainy)";
+            icon = "rain";
+          } else if (code >= 80 && code <= 82) {
+            description = "तेज बारिश (Showers)";
+            icon = "rain";
+          } else if (code >= 95 && code <= 99) {
+            description = "आंधी-तूफान (Stormy)";
+            icon = "thunderstorm";
+          }
+          return { temp, description, icon };
+        } catch (e) {
+          console.warn("Failed to fetch weather for coordinates:", lat, lon, e);
+          return null;
+        }
+      };
+
+      const [r, bi, ba] = await Promise.all([
+        fetchCity(21.2514, 81.6296), // Raipur
+        fetchCity(22.0790, 82.1391), // Bilaspur
+        fetchCity(19.0730, 82.0282), // Jagdalpur (Bastar)
+      ]);
+
+      setWeather((prev) => ({
+        raipur: r || prev.raipur,
+        bilaspur: bi || prev.bilaspur,
+        bastar: ba || prev.bastar,
+        loading: false,
+      }));
+    };
+
+    fetchWeather();
+  }, []);
+
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
   };
@@ -418,12 +494,22 @@ export default function App() {
     }
   };
 
+  // Helper mapping weather icons
+  const getWeatherIcon = (iconName: string) => {
+    if (iconName === "rain") return <CloudRain className="w-5 h-5 text-blue-550 dark:text-blue-400 animate-bounce" />;
+    if (iconName === "cloudy") return <CloudSun className="w-5 h-5 text-amber-500 dark:text-amber-400" />;
+    if (iconName === "thunderstorm") return <CloudLightning className="w-5 h-5 text-purple-500 animate-pulse" />;
+    if (iconName === "foggy") return <Cloud className="w-5 h-5 text-gray-405 dark:text-zinc-400" />;
+    if (iconName === "drizzle") return <CloudRain className="w-5 h-5 text-teal-500 dark:text-teal-400 animate-pulse" />;
+    return <Sun className="w-5 h-5 text-orange-500" style={{ animation: "spin 12s linear infinite" }} />;
+  };
+
   // Article groupings for layout
   const breakingNews = articles.filter((a) => a.is_breaking);
   
   // Hero slider selections
   const featuredArticles = articles.filter((a) => a.is_featured);
-  const finalSliderArticles = featuredArticles.length > 0 ? featuredArticles : articles.slice(0, 5);
+  const finalSliderArticles = featuredArticles.length > 0 ? featuredArticles.slice(0, 10) : articles.slice(0, 10);
   
   // Ensure the active slide index stays bounded
   const activeSlideIndex = finalSliderArticles.length > 0 ? currentSlide % finalSliderArticles.length : 0;
@@ -1085,6 +1171,51 @@ export default function App() {
                     </button>
                   </div>
 
+                  {/* WEATHER WIDGET */}
+                  <div className="border-t border-slate-100 dark:border-zinc-800/80 my-4 pt-4 px-1.5 font-body">
+                    <span className="text-[10px] font-mono tracking-widest text-slate-400 dark:text-zinc-500 uppercase font-black block mb-2.5">
+                      छत्तीसगढ़ मौसम (Weather) {weather.loading ? "• लोड हो रहा है..." : "• लाइव"}
+                    </span>
+                    <div className="bg-gradient-to-br from-pink-50/50 to-amber-50/20 dark:from-zinc-900/40 dark:to-zinc-850/20 rounded-xl p-3 border border-pink-100/30 dark:border-zinc-800 flex flex-col gap-2">
+                      {weather.raipur && (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {getWeatherIcon(weather.raipur.icon)}
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-855 dark:text-zinc-200">रायपुर (Raipur)</span>
+                              <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">{weather.raipur.description}</span>
+                            </div>
+                          </div>
+                          <span className="text-xs font-black text-pink-600 dark:text-pink-400">{weather.raipur.temp}°C</span>
+                        </div>
+                      )}
+                      {weather.bilaspur && (
+                        <div className="flex items-center justify-between border-t border-slate-100 dark:border-zinc-800/60 pt-2 mt-1">
+                          <div className="flex items-center gap-2">
+                            {getWeatherIcon(weather.bilaspur.icon)}
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-855 dark:text-zinc-200">बिलासपुर (Bilaspur)</span>
+                              <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">{weather.bilaspur.description}</span>
+                            </div>
+                          </div>
+                          <span className="text-xs font-black text-pink-600 dark:text-pink-400">{weather.bilaspur.temp}°C</span>
+                        </div>
+                      )}
+                      {weather.bastar && (
+                        <div className="flex items-center justify-between border-t border-slate-100 dark:border-zinc-800/60 pt-2 mt-1">
+                          <div className="flex items-center gap-2">
+                            {getWeatherIcon(weather.bastar.icon)}
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-855 dark:text-zinc-200">बस्तर (Bastar)</span>
+                              <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-none">{weather.bastar.description}</span>
+                            </div>
+                          </div>
+                          <span className="text-xs font-black text-pink-600 dark:text-pink-400">{weather.bastar.temp}°C</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* 6. क्राइम */}
                   <button
                     onClick={() => {
@@ -1489,38 +1620,39 @@ export default function App() {
                           </button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {trendingArticles.slice(0, 4).map((art, idx) => (
                             <a
                               key={art.id}
                               onClick={() => setSelectedArticleId(art.id)}
-                              className="group flex flex-col cursor-pointer bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-xl overflow-hidden hover:shadow-md hover:border-pink-100 dark:hover:border-zinc-700 transition-all duration-200 hover:-translate-y-0.5"
+                              className="group flex gap-3 cursor-pointer bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-xl p-2 overflow-hidden hover:shadow-md hover:border-pink-100 dark:hover:border-zinc-700 transition-all duration-200 hover:-translate-y-0.5"
                             >
-                              {/* Large thumbnail */}
-                              <div className="relative w-full aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-zinc-800">
+                              {/* Small thumbnail */}
+                              <div className="relative w-28 h-20 sm:w-32 sm:h-22 shrink-0 overflow-hidden bg-slate-100 dark:bg-zinc-800 rounded-lg">
                                 <img
-                                  src={optimizeCloudinaryUrl(art.image_url, 400)}
+                                  src={optimizeCloudinaryUrl(art.image_url, 300)}
                                   alt={art.title}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                   referrerPolicy="no-referrer"
                                   onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_NEWS_IMAGE; }}
                                 />
                                 {/* Rank badge overlay */}
-                                <div className="absolute top-2 left-2 w-6 h-6 rounded-md bg-brand-red flex items-center justify-center shadow-md">
-                                  <span className="text-[10px] font-black text-white font-mono">{idx + 1}</span>
+                                <div className="absolute top-1 left-1 w-5 h-5 rounded bg-brand-red flex items-center justify-center shadow-md">
+                                  <span className="text-[9px] font-black text-white font-mono">{idx + 1}</span>
                                 </div>
-                                {/* Category chip */}
-                                <span className="absolute bottom-2 left-2 text-[9px] font-mono font-black text-white bg-black/60 backdrop-blur-xs px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                  {categories.find(c => c.id === art.category)?.name_hi || "ताज़ा"}
-                                </span>
                               </div>
                               {/* Text content */}
-                              <div className="p-2.5 flex flex-col gap-1.5">
-                                <h3 className="text-xs font-bold text-slate-800 dark:text-zinc-100 group-hover:text-brand-red transition-colors line-clamp-2 leading-snug font-body">
-                                  {art.title}
-                                </h3>
-                                <div className="flex items-center gap-2 text-[9px] text-slate-400 dark:text-zinc-500 font-mono">
-                                  <span className="flex items-center gap-0.5"><Eye className="w-2.5 h-2.5" /> {(art.views || 0).toLocaleString()}</span>
+                              <div className="flex flex-col justify-between py-0.5 flex-1 min-w-0">
+                                <div className="flex flex-col gap-1">
+                                  {/* Category chip */}
+                                  <span className="text-[8px] font-mono font-black text-brand-red dark:text-red-400 uppercase tracking-wider">
+                                    {categories.find(c => c.id === art.category)?.name_hi || "ताज़ा"}
+                                  </span>
+                                  <h3 className="text-xs font-bold text-slate-800 dark:text-zinc-100 group-hover:text-brand-red transition-colors line-clamp-2 leading-snug font-body">
+                                    {art.title}
+                                  </h3>
+                                </div>
+                                <div className="flex items-center gap-2 text-[9px] text-slate-400 dark:text-zinc-500 font-mono mt-1">
                                   <span className="flex items-center gap-0.5"><Calendar className="w-2.5 h-2.5" /> {art.published_at}</span>
                                 </div>
                               </div>
@@ -1845,7 +1977,7 @@ export default function App() {
                             </h4>
                           </div>
                           <span className="text-[9px] font-mono text-slate-400 block mt-2.5">
-                            {art.published_at} • Views: {art.views || 0}
+                            {art.published_at}
                           </span>
                         </div>
                       </article>

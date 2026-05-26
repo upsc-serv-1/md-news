@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Article, Comment } from "../types";
 import { newsService } from "../lib/supabase";
-import { X, Calendar, User, Eye, MessageSquare, Send, Share2, Check, Video, Bookmark as BookmarkIcon } from "lucide-react";
+import { X, Calendar, User, MessageSquare, Send, Share2, Check, Video, Bookmark as BookmarkIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { parseMarkdown } from "../lib/ai";
 import { optimizeCloudinaryUrl } from "../lib/cloudinary";
@@ -145,9 +145,7 @@ export default function ArticleDetail({ articleId, onClose, onArticleUpdated }: 
               <span className="flex items-center gap-1">
                 <User className="w-3.5 h-3.5 text-brand-red dark:text-red-500" /> {article.author}
               </span>
-              <span className="flex items-center gap-1">
-                <Eye className="w-3.5 h-3.5 text-brand-red dark:text-red-500" /> {article.views} व्यूज
-              </span>
+
             </div>
 
             {/* Headline */}
